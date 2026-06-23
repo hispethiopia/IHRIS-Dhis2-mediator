@@ -1,0 +1,1536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HRH Sync — iHRIS → DHIS2</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg:        #0f1117;
+    --surface:   #181c27;
+    --border:    #252a38;
+    --border2:   #2f3547;
+    --text:      #e2e8f0;
+    --muted:     #7a8499;
+    --accent:    #3b82f6;
+    --accent2:   #60a5fa;
+    --green:     #22c55e;
+    --yellow:    #f59e0b;
+    --red:       #ef4444;
+    --mono:      'IBM Plex Mono', monospace;
+    --sans:      'IBM Plex Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    min-height: 100vh;
+  }
+
+  /* ── LOGIN ── */
+  #login-screen {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+  }
+
+  .login-card {
+    width: 380px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 40px;
+  }
+
+  .login-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 32px;
+  }
+
+  .login-logo svg { flex-shrink: 0; }
+
+  .login-logo-text { font-size: 13px; font-weight: 500; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
+
+  .login-title { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+  .login-sub { color: var(--muted); font-size: 13px; margin-bottom: 28px; }
+
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 12px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .field input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    padding: 10px 12px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .field input:focus { border-color: var(--accent); }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    font-family: var(--sans); font-size: 14px; font-weight: 500;
+    border: none; border-radius: 6px; cursor: pointer; padding: 10px 18px;
+    transition: opacity 0.15s, background 0.15s;
+  }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-primary { background: var(--accent); color: #fff; width: 100%; justify-content: center; padding: 11px; }
+  .btn-primary:hover:not(:disabled) { background: var(--accent2); }
+  .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border2); }
+  .btn-outline:hover:not(:disabled) { border-color: var(--accent); color: var(--accent2); }
+  .btn-green { background: var(--green); color: #fff; }
+  .btn-green:hover:not(:disabled) { opacity: 0.85; }
+  .btn-red { background: var(--red); color: #fff; }
+  .btn-red:hover:not(:disabled) { opacity: 0.85; }
+
+  .error-msg { color: var(--red); font-size: 13px; margin-top: 12px; display: none; }
+
+  /* ── APP SHELL ── */
+  #app { display: none; flex-direction: column; min-height: 100vh; }
+
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px; height: 56px;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 100;
+  }
+
+  .header-left { display: flex; align-items: center; gap: 12px; }
+  .header-logo { font-size: 13px; font-weight: 600; letter-spacing: 0.04em; color: var(--text); }
+  .header-sep { color: var(--border2); }
+  .header-user { font-size: 13px; color: var(--muted); }
+
+  .header-right { display: flex; align-items: center; gap: 10px; }
+
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 6px var(--green);
+  }
+  .status-dot.offline { background: var(--red); box-shadow: 0 0 6px var(--red); }
+
+  nav {
+    display: flex; gap: 2px;
+    padding: 0 24px;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+  }
+
+  .nav-tab {
+    padding: 12px 16px; font-size: 13px; font-weight: 500; color: var(--muted);
+    cursor: pointer; border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+    background: none; border-top: none; border-left: none; border-right: none;
+    font-family: var(--sans);
+  }
+  .nav-tab:hover { color: var(--text); }
+  .nav-tab.active { color: var(--accent2); border-bottom-color: var(--accent); }
+
+  main { flex: 1; padding: 28px 24px; max-width: 1200px; width: 100%; margin: 0 auto; }
+
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ── CARDS & LAYOUT ── */
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+  .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 24px; }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 20px;
+  }
+
+  .card-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 10px; }
+  .card-value { font-size: 28px; font-weight: 600; font-family: var(--mono); }
+  .card-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .section-title { font-size: 15px; font-weight: 600; }
+  .section-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+  /* ── SYNC CONTROLS ── */
+  .sync-panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 24px; margin-bottom: 24px;
+  }
+
+  .sync-row { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+
+  .period-input { display: flex; flex-direction: column; gap: 6px; }
+  .period-input label { font-size: 12px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .period-input input {
+    background: var(--bg); border: 1px solid var(--border2); border-radius: 6px;
+    color: var(--text); font-family: var(--mono); font-size: 14px;
+    padding: 9px 12px; outline: none; width: 140px;
+    transition: border-color 0.15s;
+  }
+  .period-input input:focus { border-color: var(--accent); }
+
+  .toggle-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .toggle { position: relative; width: 36px; height: 20px; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider {
+    position: absolute; inset: 0; background: var(--border2); border-radius: 20px;
+    cursor: pointer; transition: background 0.2s;
+  }
+  .toggle-slider:before {
+    content: ''; position: absolute; width: 14px; height: 14px;
+    left: 3px; top: 3px; background: white; border-radius: 50%;
+    transition: transform 0.2s;
+  }
+  .toggle input:checked + .toggle-slider { background: var(--accent); }
+  .toggle input:checked + .toggle-slider:before { transform: translateX(16px); }
+  .toggle-label { font-size: 13px; color: var(--muted); }
+
+  /* ── PROGRESS ── */
+  .progress-steps { display: flex; flex-direction: column; gap: 8px; margin-top: 20px; }
+  .step-row { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+  .step-icon { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; }
+  .step-icon.pending { background: var(--border2); color: var(--muted); }
+  .step-icon.running { background: var(--accent); color: #fff; animation: pulse 1s infinite; }
+  .step-icon.done { background: var(--green); color: #fff; }
+  .step-icon.error { background: var(--red); color: #fff; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+  /* ── DATA PREVIEW TABLE ── */
+  .preview-wrap { overflow-x: auto; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead tr { border-bottom: 1px solid var(--border2); }
+  th { text-align: left; padding: 10px 12px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); white-space: nowrap; }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--text); }
+  tbody tr:hover { background: rgba(59,130,246,0.04); }
+  tbody tr:last-child td { border-bottom: none; }
+
+  .badge {
+    display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 600; font-family: var(--mono); white-space: nowrap;
+  }
+  .badge-blue { background: rgba(59,130,246,0.15); color: var(--accent2); }
+  .badge-green { background: rgba(34,197,94,0.15); color: var(--green); }
+  .badge-yellow { background: rgba(245,158,11,0.15); color: var(--yellow); }
+  .badge-red { background: rgba(239,68,68,0.15); color: var(--red); }
+  .badge-gray { background: var(--border); color: var(--muted); }
+
+  .mono { font-family: var(--mono); }
+
+  /* ── APPROVAL PANEL ── */
+  .approval-bar {
+    position: sticky; bottom: 0;
+    background: var(--surface); border-top: 1px solid var(--border2);
+    padding: 16px 24px;
+    display: none; align-items: center; justify-content: space-between;
+    gap: 16px; z-index: 50;
+  }
+  .approval-bar.visible { display: flex; }
+  .approval-info { font-size: 13px; color: var(--muted); }
+  .approval-info strong { color: var(--text); }
+  .approval-actions { display: flex; gap: 10px; }
+
+  /* ── LOG ── */
+  .log-box {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    padding: 16px; font-family: var(--mono); font-size: 12px; color: var(--muted);
+    height: 260px; overflow-y: auto; line-height: 1.7;
+  }
+  .log-line { display: block; }
+  .log-line.info { color: var(--text); }
+  .log-line.warn { color: var(--yellow); }
+  .log-line.error { color: var(--red); }
+  .log-line.success { color: var(--green); }
+
+  /* ── EMPTY STATE ── */
+  .empty {
+    text-align: center; padding: 60px 24px; color: var(--muted);
+  }
+  .empty-icon { font-size: 32px; margin-bottom: 12px; }
+  .empty-title { font-size: 15px; font-weight: 500; color: var(--text); margin-bottom: 6px; }
+  .empty-sub { font-size: 13px; }
+
+  /* ── DATASET TABS ── */
+  .ds-tabs { display: flex; gap: 4px; margin-bottom: 16px; }
+  .ds-tab {
+    padding: 6px 14px; font-size: 12px; font-weight: 500; border-radius: 4px;
+    cursor: pointer; border: 1px solid var(--border2); color: var(--muted);
+    background: transparent; font-family: var(--sans);
+    transition: all 0.15s;
+  }
+  .ds-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .ds-tab:hover:not(.active) { border-color: var(--accent); color: var(--accent2); }
+
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .chip { display: inline-flex; align-items: center; gap: 4px; background: var(--border); border-radius: 4px; padding: 2px 8px; font-size: 11px; color: var(--muted); font-family: var(--mono); }
+
+  hr.divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+  /* ── DATA TABLES ── */
+  td.num, th.num { text-align: right; font-family: var(--mono); }
+  tr.total-row td { font-weight: 600; border-top: 1px solid var(--border2); }
+  .filter-input {
+    width: 100%; max-width: 320px;
+    background: var(--bg); border: 1px solid var(--border2); border-radius: 6px;
+    color: var(--text); font-family: var(--sans); font-size: 13px;
+    padding: 8px 12px; outline: none; margin-bottom: 12px;
+    transition: border-color 0.15s; display: block;
+  }
+  .filter-input:focus { border-color: var(--accent); }
+  .ou-scroll { max-height: 420px; overflow-y: auto; }
+
+  /* ── DATA ELEMENT DETAIL ── */
+  .de-expand-btn {
+    background: none; border: none; color: var(--accent2); cursor: pointer;
+    font-size: 11px; font-family: var(--mono); padding: 0;
+  }
+  .de-expand-btn:hover { text-decoration: underline; }
+  .de-detail-row { display: none; }
+  .de-detail-row.open { display: table-row; }
+  .de-detail-panel {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    padding: 10px 14px; margin: 4px 0 6px;
+    font-size: 12px; font-family: var(--mono);
+    max-height: 200px; overflow-y: auto;
+  }
+  .de-detail-panel table { font-size: 12px; }
+  .de-ds-tabs { display: flex; gap: 4px; margin-bottom: 12px; flex-wrap: wrap; }
+
+  /* ── VERIFY ── */
+  .verify-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; font-family: var(--mono);
+  }
+  .verify-badge.match { background: rgba(34,197,94,0.15); color: var(--green); }
+  .verify-badge.mismatch { background: rgba(245,158,11,0.15); color: var(--yellow); }
+  .verify-badge.missing { background: rgba(239,68,68,0.15); color: var(--red); }
+
+  /* ── LOGS PAGE ── */
+  #page-logs { display: none; flex-direction: column; height: calc(100vh - 56px - 42px - 56px); min-height: 400px; }
+  #page-logs.active { display: flex; }
+  #page-logs #log-stream { flex: 1; min-height: 0; }
+
+  .logs-toolbar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 0 12px; flex-shrink: 0;
+  }
+
+  .live-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 600;
+    font-family: var(--mono);
+  }
+  .live-badge.connected { background: rgba(34,197,94,0.15); color: var(--green); }
+  .live-badge.paused    { background: rgba(245,158,11,0.15); color: var(--yellow); }
+  .live-badge.error     { background: rgba(239,68,68,0.15);  color: var(--red); }
+
+  .live-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: currentColor;
+  }
+  .live-badge.connected .live-dot { animation: pulse 1.4s infinite; }
+
+  #log-stream {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.75;
+    overflow-y: auto;
+    overflow-x: auto;
+    white-space: pre;
+  }
+
+  .ll { display: block; }
+  .ll-info  { color: #c9d1e0; }
+  .ll-warn  { color: var(--yellow); }
+  .ll-error { color: var(--red); }
+  .ll-debug { color: #4a5568; }
+  .ll-ts    { color: #4a5568; margin-right: 4px; }
+  .ll-lvl   { font-weight: 600; margin-right: 6px; }
+  .ll-lvl-info  { color: var(--accent2); }
+  .ll-lvl-warn  { color: var(--yellow); }
+  .ll-lvl-error { color: var(--red); }
+
+  @media (max-width: 700px) {
+    .grid-3 { grid-template-columns: 1fr 1fr; }
+    .grid-2 { grid-template-columns: 1fr; }
+    .sync-row { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══ LOGIN ════════════════════════════════════════════════════════════════ -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+        <rect width="32" height="32" rx="6" fill="#1e40af"/>
+        <path d="M8 16h6m0 0l-2-2m2 2l-2 2" stroke="#60a5fa" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M18 16h6m-6 0l2-2m-2 2l2 2" stroke="#60a5fa" stroke-width="1.5" stroke-linecap="round"/>
+        <circle cx="16" cy="16" r="2" fill="#93c5fd"/>
+      </svg>
+      <span class="login-logo-text">HRH Integration</span>
+    </div>
+    <div class="login-title">Sign in</div>
+    <div class="login-sub">iHRIS → DHIS2 Sync Dashboard</div>
+    <div class="field">
+      <label>Username</label>
+      <input type="text" id="login-user" placeholder="admin@ihris.org" autocomplete="username"/>
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password"/>
+    </div>
+    <button class="btn btn-primary" id="login-btn" onclick="doLogin()">Sign in</button>
+    <div class="error-msg" id="login-error"></div>
+  </div>
+</div>
+
+<!-- ══ APP ═══════════════════════════════════════════════════════════════════ -->
+<div id="app">
+  <header>
+    <div class="header-left">
+      <svg width="24" height="24" viewBox="0 0 32 32" fill="none">
+        <rect width="32" height="32" rx="6" fill="#1e40af"/>
+        <path d="M8 16h6m0 0l-2-2m2 2l-2 2" stroke="#60a5fa" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M18 16h6m-6 0l2-2m-2 2l2 2" stroke="#60a5fa" stroke-width="1.5" stroke-linecap="round"/>
+        <circle cx="16" cy="16" r="2" fill="#93c5fd"/>
+      </svg>
+      <span class="header-logo">HRH Sync</span>
+      <span class="header-sep">|</span>
+      <span class="header-user" id="header-user">—</span>
+    </div>
+    <div class="header-right">
+      <div class="status-dot" id="status-dot"></div>
+      <span style="font-size:12px;color:var(--muted)" id="status-label">Checking...</span>
+      <button class="btn btn-outline" style="padding:6px 12px;font-size:12px" onclick="doLogout()">Sign out</button>
+    </div>
+  </header>
+
+  <nav>
+    <button class="nav-tab active" onclick="showPage('dashboard')">Dashboard</button>
+    <button class="nav-tab" onclick="showPage('preview')">Data Preview</button>
+    <button class="nav-tab" onclick="showPage('verify')">Verify in DHIS2</button>
+    <button class="nav-tab" onclick="showPage('history')">Sync History</button>
+    <button class="nav-tab" onclick="showPage('logs')" id="nav-logs">Logs</button>
+  </nav>
+
+  <main>
+
+    <!-- ── DASHBOARD ── -->
+    <div class="page active" id="page-dashboard">
+      <div class="grid-3">
+        <div class="card">
+          <div class="card-title">Practitioners</div>
+          <div class="card-value" id="stat-practitioners">—</div>
+          <div class="card-sub">Fetched from iHRIS</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Active Roles</div>
+          <div class="card-value" id="stat-roles">—</div>
+          <div class="card-sub">PractitionerRole records</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Org Units</div>
+          <div class="card-value" id="stat-orgunits">—</div>
+          <div class="card-sub">Mapped in DHIS2</div>
+        </div>
+      </div>
+
+      <div class="sync-panel">
+        <div class="section-header" style="margin-bottom:18px">
+          <div>
+            <div class="section-title">Run Sync</div>
+            <div class="section-sub">Extract workforce data from iHRIS and push to DHIS2</div>
+          </div>
+        </div>
+
+        <div class="sync-row">
+          <div class="period-input">
+            <label>Period</label>
+            <input type="text" id="period-input" placeholder="2026" />
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label style="font-size:12px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em">Mode</label>
+            <div class="toggle-row">
+              <label class="toggle">
+                <input type="checkbox" id="dryrun-toggle">
+                <span class="toggle-slider"></span>
+              </label>
+              <span class="toggle-label">Dry run (preview only — don't push to DHIS2)</span>
+            </div>
+          </div>
+          <button class="btn btn-primary" id="sync-btn" onclick="runSync()" style="width:auto;padding:9px 20px">
+            Run Sync
+          </button>
+        </div>
+
+        <div class="progress-steps" id="sync-steps" style="display:none">
+          <hr class="divider">
+          <div class="step-row" id="step-validate">
+            <div class="step-icon pending" id="step-validate-icon">1</div>
+            <span>Validate DHIS2 datasets</span>
+          </div>
+          <div class="step-row" id="step-orgunits">
+            <div class="step-icon pending" id="step-orgunits-icon">2</div>
+            <span>Load org units from DHIS2</span>
+          </div>
+          <div class="step-row" id="step-extract">
+            <div class="step-icon pending" id="step-extract-icon">3</div>
+            <span>Extract data from iHRIS</span>
+            <span id="step-extract-detail" style="font-size:12px;color:var(--muted);margin-left:4px"></span>
+          </div>
+          <div class="step-row" id="step-transform">
+            <div class="step-icon pending" id="step-transform-icon">4</div>
+            <span>Transform &amp; aggregate</span>
+          </div>
+          <div class="step-row" id="step-push">
+            <div class="step-icon pending" id="step-push-icon">5</div>
+            <span id="step-push-label">Push to DHIS2</span>
+          </div>
+        </div>
+
+        <div id="sync-result" style="display:none;margin-top:16px"></div>
+      </div>
+
+      <div class="section-header">
+        <div><div class="section-title">Last Sync</div></div>
+        <button class="btn btn-outline" style="font-size:12px;padding:6px 12px" onclick="loadStatus()">Refresh</button>
+      </div>
+      <div id="last-sync-panel">
+        <div class="empty"><div class="empty-icon">⏳</div><div class="empty-title">No sync yet</div><div class="empty-sub">Run a sync above to get started</div></div>
+      </div>
+    </div>
+
+    <!-- ── PREVIEW ── -->
+    <div class="page" id="page-preview">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Data Preview</div>
+          <div class="section-sub">Run a dry-run sync to preview what will be pushed to DHIS2 before approving</div>
+        </div>
+        <button class="btn btn-outline" style="font-size:12px;padding:6px 12px" onclick="runDryRun()">
+          ▶ Fetch Preview
+        </button>
+      </div>
+
+      <div id="preview-content">
+        <div class="empty"><div class="empty-icon">🔍</div><div class="empty-title">No preview loaded</div><div class="empty-sub">Click "Fetch Preview" to load a dry-run of the current period</div></div>
+      </div>
+    </div>
+
+    <!-- ── VERIFY ── -->
+    <div class="page" id="page-verify">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Verify in DHIS2</div>
+          <div class="section-sub">Query DHIS2 directly to confirm pushed data values are stored</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <div class="period-input" style="margin:0">
+            <input type="text" id="verify-period-input" placeholder="Enter current Ethiopian Year eg 2018" style="width:120px;background:var(--bg);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:13px;padding:8px 10px;outline:none"/>
+          </div>
+          <button class="btn btn-outline" style="font-size:12px;padding:6px 14px" onclick="runVerify()">
+            ▶ Query DHIS2
+          </button>
+        </div>
+      </div>
+      <div id="verify-content">
+        <div class="empty"><div class="empty-icon">🔎</div><div class="empty-title">Not verified yet</div><div class="empty-sub">Enter the period you pushed and click Query DHIS2</div></div>
+      </div>
+    </div>
+
+    <!-- ── HISTORY ── -->
+    <div class="page" id="page-history">
+      <div class="section-header">
+        <div><div class="section-title">Sync History</div></div>
+        <button class="btn btn-outline" style="font-size:12px;padding:6px 12px" onclick="loadHistory()">Refresh</button>
+      </div>
+      <div id="history-content">
+        <div class="empty"><div class="empty-icon">📋</div><div class="empty-title">No history yet</div><div class="empty-sub">Completed syncs will appear here</div></div>
+      </div>
+    </div>
+
+    <!-- ── LOGS ── -->
+    <div class="page" id="page-logs">
+      <div class="logs-toolbar">
+        <span id="log-live-badge" class="live-badge error">
+          <span class="live-dot"></span> Disconnected
+        </span>
+        <span style="font-size:12px;color:var(--muted)" id="log-line-count"></span>
+        <div style="flex:1"></div>
+        <button class="btn btn-outline" style="font-size:12px;padding:5px 12px" onclick="toggleLogScroll()" id="log-scroll-btn">⏸ Pause scroll</button>
+        <button class="btn btn-outline" style="font-size:12px;padding:5px 12px" onclick="clearLogDisplay()">Clear display</button>
+      </div>
+      <div id="log-stream"></div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ── APPROVAL BAR ── -->
+<div class="approval-bar" id="approval-bar">
+  <div class="approval-info">
+    <strong id="approval-count">0 data values</strong> ready to push to DHIS2
+    — period <strong id="approval-period">—</strong>
+  </div>
+  <div class="approval-actions">
+    <button class="btn btn-outline" onclick="rejectSync()">✕ Reject</button>
+    <button class="btn btn-green" onclick="approveSync()">✓ Approve &amp; Push</button>
+  </div>
+</div>
+
+<script>
+// ── STATE ────────────────────────────────────────────────────────────────────
+let currentUser = null;
+let pendingPayload = null; // dry-run result waiting for approval
+let syncHistory = [];
+
+// ── AUTH ─────────────────────────────────────────────────────────────────────
+async function doLogin() {
+  const user = document.getElementById('login-user').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const btn = document.getElementById('login-btn');
+  const err = document.getElementById('login-error');
+
+  if (!user || !pass) { showErr('Please enter username and password'); return; }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Signing in…';
+  err.style.display = 'none';
+
+  try {
+    const res = await fetch('/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: user, password: pass }),
+      credentials: 'include',
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || 'Login failed');
+
+    currentUser = data.user?.name || user;
+    document.getElementById('header-user').textContent = currentUser;
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    document.getElementById('app').style.flexDirection = 'column';
+
+    // Set default period to current quarter
+    const defaultPeriod = getCurrentQuarter();
+    document.getElementById('period-input').value = defaultPeriod;
+    document.getElementById('verify-period-input').value = defaultPeriod;
+    loadStatus();
+  } catch (e) {
+    showErr(e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Sign in';
+  }
+}
+
+function showErr(msg) {
+  const err = document.getElementById('login-error');
+  err.textContent = msg;
+  err.style.display = 'block';
+}
+
+async function doLogout() {
+  try { await fetch('/auth/logout', { method: 'POST', credentials: 'include' }); } catch {}
+  currentUser = null;
+  pendingPayload = null;
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('login-pass').value = '';
+}
+
+// Central fetch wrapper — redirects to login on 401
+async function apiFetch(url, opts = {}) {
+  const res = await fetch(url, { credentials: 'include', ...opts });
+  if (res.status === 401) { doLogout(); return null; }
+  return res;
+}
+
+document.getElementById('login-pass').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+
+// ── HEALTH CHECK ─────────────────────────────────────────────────────────────
+async function loadStatus() {
+  try {
+    const res = await fetch('/health');
+    const data = await res.json();
+    const dot = document.getElementById('status-dot');
+    const lbl = document.getElementById('status-label');
+    if (data.status === 'up') {
+      dot.className = 'status-dot';
+      lbl.textContent = 'Connected';
+    } else {
+      dot.className = 'status-dot offline';
+      lbl.textContent = 'Offline';
+    }
+    if (data.lastSync) renderLastSync(data.lastSync);
+  } catch {
+    document.getElementById('status-dot').className = 'status-dot offline';
+    document.getElementById('status-label').textContent = 'Offline';
+  }
+}
+
+// ── DEBUG STATS (populated from sync results, not a separate API call) ────────
+function updateStatsFromSync(data) {
+  if (!data) return;
+  document.getElementById('stat-practitioners').textContent = data.steps?.extract?.practitioners ?? '—';
+  document.getElementById('stat-roles').textContent = data.steps?.extract?.practitionerRoles ?? '—';
+  document.getElementById('stat-orgunits').textContent = data.steps?.orgUnits ?? '—';
+}
+
+// ── SYNC ─────────────────────────────────────────────────────────────────────
+
+// Poll /sync-hrh/status every 3 s until syncInProgress is false, then call onDone(lastSync).
+function pollUntilDone(onDone) {
+  return new Promise((resolve) => {
+    const iv = setInterval(async () => {
+      try {
+        const r = await apiFetch('/sync-hrh/status');
+        if (!r) { clearInterval(iv); resolve(); return; }
+        const s = await r.json();
+        if (s.status !== 'in_progress') {
+          clearInterval(iv);
+          onDone(s.lastSync);
+          resolve();
+        }
+      } catch { /* keep polling */ }
+    }, 3000);
+  });
+}
+
+// Apply the final sync result to the step indicators and result panel.
+function applySyncResult(data, dryRun) {
+  if (!data) { setStep('validate', 'error'); return; }
+
+  if (data.steps?.validateDatasets === 'OK') setStep('validate', 'done');
+  else setStep('validate', 'error');
+
+  if (data.steps?.orgUnits > 0) setStep('orgunits', 'done');
+  else setStep('orgunits', 'error');
+
+  if (data.steps?.extract) {
+    document.getElementById('step-extract-detail').textContent =
+      `(${data.steps.extract.practitioners} practitioners, ${data.steps.extract.practitionerRoles} roles)`;
+    setStep('extract', 'done');
+    updateStatsFromSync(data);
+  } else { setStep('extract', 'error'); }
+
+  const totalValues = Object.values(data.datasets || {}).reduce((s, d) => s + d.dataValues, 0);
+  setStep('transform', totalValues > 0 ? 'done' : 'error');
+
+  if (dryRun) {
+    setStep('push', 'done');
+    document.getElementById('step-push-label').textContent = 'Push skipped (dry run)';
+    if (totalValues > 0) {
+      const period = data.period;
+      pendingPayload = { period, data };
+      document.getElementById('approval-count').textContent = totalValues + ' data values';
+      document.getElementById('approval-period').textContent = period;
+      document.getElementById('approval-bar').classList.add('visible');
+    }
+  } else {
+    setStep('push', data.success ? 'done' : 'error');
+    if (!dryRun) syncHistory.unshift({ ...data, ranAt: new Date().toISOString() });
+  }
+
+  renderSyncResult(data, dryRun);
+  loadStatus();
+}
+
+async function runSync() {
+  const period = document.getElementById('period-input').value.trim() || getCurrentQuarter();
+  const dryRun = document.getElementById('dryrun-toggle').checked;
+
+  const btn = document.getElementById('sync-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Running…';
+
+  document.getElementById('sync-steps').style.display = 'flex';
+  document.getElementById('sync-steps').style.flexDirection = 'column';
+  document.getElementById('sync-result').style.display = 'none';
+  document.getElementById('approval-bar').classList.remove('visible');
+
+  resetSteps();
+  setStep('validate', 'running');
+
+  // Animate steps progressively while poll is running (estimates only)
+  const stepTimers = [
+    setTimeout(() => setStep('orgunits',  'running'), 3000),
+    setTimeout(() => setStep('extract',   'running'), 6000),
+    setTimeout(() => setStep('transform', 'running'), 16000),
+    setTimeout(() => setStep('push',      'running'), 20000),
+  ];
+  const clearStepTimers = () => stepTimers.forEach(t => clearTimeout(t));
+
+  try {
+    // POST returns 202 immediately — no browser timeout risk
+    const res = await apiFetch('/sync-hrh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ period, dryRun }),
+    });
+    if (!res) { clearStepTimers(); btn.disabled = false; btn.textContent = 'Run Sync'; return; }
+    if (res.status === 409) {
+      clearStepTimers();
+      document.getElementById('sync-result').style.display = 'block';
+      document.getElementById('sync-result').innerHTML =
+        `<div style="color:var(--yellow);font-size:13px">A sync is already in progress — please wait.</div>`;
+      btn.disabled = false; btn.textContent = 'Run Sync'; return;
+    }
+
+    // Poll until the background sync finishes
+    await pollUntilDone((data) => { clearStepTimers(); applySyncResult(data, dryRun); });
+
+  } catch (e) {
+    clearStepTimers();
+    setStep('validate', 'error');
+    document.getElementById('sync-result').style.display = 'block';
+    document.getElementById('sync-result').innerHTML =
+      `<div style="color:var(--red);font-size:13px">Error: ${e.message}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Run Sync';
+  }
+}
+
+async function runDryRun() {
+  const period = document.getElementById('period-input').value.trim() || getCurrentQuarter();
+  const btn = event.target;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Loading…';
+
+  try {
+    const res = await apiFetch('/sync-hrh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ period, dryRun: true }),
+    });
+    if (!res) { btn.disabled = false; btn.innerHTML = '▶ Fetch Preview'; return; }
+
+    await pollUntilDone((data) => {
+      if (!data) return;
+      renderPreview(data, data.period);
+      pendingPayload = { period: data.period, data };
+      const totalValues = Object.values(data.datasets || {}).reduce((s, d) => s + d.dataValues, 0);
+      if (totalValues > 0) {
+        document.getElementById('approval-count').textContent = totalValues + ' data values';
+        document.getElementById('approval-period').textContent = data.period;
+        document.getElementById('approval-bar').classList.add('visible');
+      }
+    });
+  } catch(e) {
+    document.getElementById('preview-content').innerHTML =
+      `<div style="color:var(--red);padding:20px">Error: ${e.message}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '▶ Fetch Preview';
+  }
+}
+
+// ── APPROVAL ─────────────────────────────────────────────────────────────────
+async function approveSync() {
+  if (!pendingPayload) return;
+  const { period } = pendingPayload;
+
+  const btn = document.querySelector('.btn-green');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Pushing…';
+
+  try {
+    const res = await apiFetch('/sync-hrh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ period, dryRun: false }),
+    });
+    if (!res) { btn.disabled = false; btn.textContent = '✓ Approve & Push'; return; }
+
+    pendingPayload = null;
+    document.getElementById('approval-bar').classList.remove('visible');
+
+    await pollUntilDone((data) => {
+      if (!data) return;
+      syncHistory.unshift({ ...data, ranAt: new Date().toISOString() });
+      showPage('dashboard');
+      renderSyncResult(data, false);
+      loadStatus();
+      alert(data.success ? '✓ Data pushed to DHIS2 successfully' : '✗ Push completed with errors — check sync history');
+    });
+  } catch(e) {
+    alert('Error: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '✓ Approve & Push';
+  }
+}
+
+function rejectSync() {
+  pendingPayload = null;
+  document.getElementById('approval-bar').classList.remove('visible');
+}
+
+// ── RENDER HELPERS ────────────────────────────────────────────────────────────
+function renderSyncResult(data, dryRun) {
+  const el = document.getElementById('sync-result');
+  el.style.display = 'block';
+
+  const totalValues = Object.values(data.datasets || {}).reduce((s, d) => s + d.dataValues, 0);
+  const color = data.success ? 'var(--green)' : 'var(--red)';
+  const icon = data.success ? '✓' : '✗';
+
+  const dsRows = Object.entries(data.datasets || {}).map(([label, ds]) => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px">
+      <span style="color:var(--muted)">${label}</span>
+      <div style="display:flex;gap:12px;align-items:center">
+        <span class="chip">${ds.dataValues} values</span>
+        <span class="chip">${ds.orgUnits} org units</span>
+      </div>
+    </div>
+  `).join('');
+
+  el.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;margin-top:4px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+        <span style="color:${color};font-size:16px">${icon}</span>
+        <span style="font-weight:600">${dryRun ? 'Dry run complete' : (data.success ? 'Sync complete' : 'Sync failed')}</span>
+        <span style="color:var(--muted);font-size:12px;margin-left:auto">${data.durationSeconds}s · ${data.period}</span>
+      </div>
+      ${data.error ? `<div style="color:var(--red);font-size:13px;margin-bottom:10px">${data.error}</div>` : ''}
+      ${dsRows}
+      ${dryRun && totalValues > 0 ? `<div style="margin-top:12px;font-size:13px;color:var(--muted)">Review in the <strong style="color:var(--text)">Data Preview</strong> tab, then approve to push.</div>` : ''}
+    </div>
+    ${renderDataTables(data)}
+  `;
+}
+
+function renderLastSync(sync) {
+  const el = document.getElementById('last-sync-panel');
+  const color = sync.success ? 'var(--green)' : 'var(--red)';
+  el.innerHTML = `
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <span style="font-size:13px;font-weight:600;color:${color}">${sync.success ? '✓ Success' : '✗ Failed'}</span>
+          <span style="font-family:var(--mono);font-size:13px;color:var(--muted);margin-left:12px">${sync.period}</span>
+        </div>
+        <span style="font-size:12px;color:var(--muted)">${sync.completedAt ? new Date(sync.completedAt).toLocaleString() : ''}</span>
+      </div>
+    </div>
+  `;
+}
+
+function renderPreview(data, period) {
+  const el = document.getElementById('preview-content');
+  const datasets = data.datasets || {};
+
+  if (Object.values(datasets).every(d => d.dataValues === 0)) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-title">No data values generated</div><div class="empty-sub">Check org unit mapping and iHRIS data</div></div>`;
+    return;
+  }
+
+  const dsKeys = Object.keys(datasets);
+  const tabHtml = dsKeys.map((k, i) =>
+    `<button class="ds-tab ${i===0?'active':''}" onclick="switchDsTab(this,${i})">${k.replace('UC-P2-0','UC').split(' ').slice(0,2).join(' ')}</button>`
+  ).join('');
+
+  const tabContent = dsKeys.map((k, i) => {
+    const ds = datasets[k];
+    return `
+      <div data-ds-panel="${i}" style="display:${i===0?'block':'none'}">
+        <div style="display:flex;gap:12px;margin-bottom:4px">
+          <span class="chip">${ds.dataValues} data values</span>
+          <span class="chip">${ds.orgUnits} org units</span>
+          <span class="chip">Period: ${period}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="card">
+      <div class="section-header" style="margin-bottom:14px">
+        <div><div class="section-title">Sync Preview — ${period}</div><div class="section-sub">Review before pushing to DHIS2</div></div>
+      </div>
+      <div class="ds-tabs">${tabHtml}</div>
+      ${tabContent}
+    </div>
+    ${renderDataTables(data)}
+  `;
+}
+
+function switchDsTab(btn, idx) {
+  const card = btn.closest('.card');
+  card.querySelectorAll(':scope > .ds-tabs > .ds-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  card.querySelectorAll('[data-ds-panel]').forEach(p => p.style.display = 'none');
+  const panel = card.querySelector(`[data-ds-panel="${idx}"]`);
+  if (panel) panel.style.display = 'block';
+}
+
+function loadHistory() {
+  const el = document.getElementById('history-content');
+  if (syncHistory.length === 0) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">No history yet</div></div>`;
+    return;
+  }
+  el.innerHTML = `
+    <div class="card">
+      <table>
+        <thead><tr>
+          <th>Period</th><th>Status</th><th>Datasets</th><th>Duration</th><th>Time</th>
+        </tr></thead>
+        <tbody>
+        ${syncHistory.map(s => `
+          <tr>
+            <td class="mono">${s.period}</td>
+            <td><span class="badge ${s.success?'badge-green':'badge-red'}">${s.success?'SUCCESS':'FAILED'}</span></td>
+            <td>${Object.entries(s.datasets||{}).map(([k,v])=>`<span class="chip" style="margin-right:4px">${v.dataValues}v</span>`).join('')}</td>
+            <td class="mono">${s.durationSeconds}s</td>
+            <td style="color:var(--muted)">${new Date(s.ranAt).toLocaleString()}</td>
+          </tr>
+        `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+// ── STEP HELPERS ──────────────────────────────────────────────────────────────
+function resetSteps() {
+  ['validate','orgunits','extract','transform','push'].forEach((s,i) => {
+    const el = document.getElementById('step-'+s+'-icon');
+    el.className = 'step-icon pending';
+    el.textContent = i+1;
+  });
+  document.getElementById('step-extract-detail').textContent = '';
+  document.getElementById('step-push-label').textContent = 'Push to DHIS2';
+}
+
+function setStep(name, state) {
+  const el = document.getElementById('step-'+name+'-icon');
+  el.className = 'step-icon ' + state;
+  el.textContent = state === 'done' ? '✓' : state === 'error' ? '✗' : state === 'running' ? '…' : el.textContent;
+}
+
+// ── UTILS ─────────────────────────────────────────────────────────────────────
+function getCurrentQuarter() {
+  return String(new Date().getFullYear());
+}
+
+// ── DATA TABLES ──────────────────────────────────────────────────────────────
+function fmtCadre(key) {
+  return key.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function fmtDeName(key) {
+  // "DE_NURSES_END_OF_YEAR" → "Nurses — End of Year"
+  const parts = key.replace(/^DE_/, '').split('_');
+  const statusKeywords = ['END', 'OF', 'YEAR', 'LEAVING', 'RECRUITED'];
+  const splitIdx = parts.findIndex(p => statusKeywords.includes(p));
+  if (splitIdx > 0) {
+    const cadre = parts.slice(0, splitIdx).map(w => w[0] + w.slice(1).toLowerCase()).join(' ');
+    const status = parts.slice(splitIdx).map(w => w[0] + w.slice(1).toLowerCase()).join(' ');
+    return `${cadre} — ${status}`;
+  }
+  return parts.map(w => w[0] + w.slice(1).toLowerCase()).join(' ');
+}
+
+let _deExpandState = {};
+
+function toggleDeDetail(uid) {
+  _deExpandState[uid] = !_deExpandState[uid];
+  const row = document.getElementById('de-detail-' + uid);
+  if (row) row.className = 'de-detail-row' + (_deExpandState[uid] ? ' open' : '');
+  const btn = document.getElementById('de-btn-' + uid);
+  if (btn) btn.textContent = _deExpandState[uid] ? '▲ collapse' : '▶ expand';
+}
+
+function renderDataTables(data) {
+  const cadre  = data.cadreSummary || [];
+  const ou     = data.orgUnitBreakdown || [];
+  const deData = data.dataElementsDetail || [];
+  if (!cadre.length && !deData.length) return '';
+
+  const n = v => Number(v || 0).toLocaleString();
+  const sum = (arr, f) => arr.reduce((s, r) => s + (r[f] || 0), 0);
+
+  // ── Tab 1: By Cadre ──
+  const cadreRows = cadre.map(r => `
+    <tr>
+      <td>${fmtCadre(r.cadre)}</td>
+      <td class="num">${n(r.active)}</td>
+      <td class="num">${n(r.attrition)}</td>
+      <td class="num">${n(r.recruited)}</td>
+    </tr>`).join('');
+
+  // ── Tab 2: By Org Unit (with UID) ──
+  const ouRows = ou.length
+    ? ou.map(r => `
+    <tr>
+      <td>${r.name}</td>
+      <td class="mono" style="color:var(--muted);font-size:11px">${r.orgUnit || ''}</td>
+      <td class="num">${n(r.active)}</td>
+      <td class="num">${n(r.attrition)}</td>
+      <td class="num">${n(r.recruited)}</td>
+    </tr>`).join('')
+    : `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px">No mapped org units</td></tr>`;
+
+  // ── Tab 3: Data Elements ──
+  _deExpandState = {};
+  let deTabsHtml = '';
+  let dePanelsHtml = '';
+
+  if (deData.length) {
+    deTabsHtml = `<div class="de-ds-tabs">` +
+      deData.map((ds, i) => `<button class="ds-tab${i===0?' active':''}" onclick="switchDeDataset(this,${i})">${ds.label}</button>`).join('') +
+      `</div>`;
+
+    dePanelsHtml = deData.map((ds, i) => {
+      const rows = ds.elements.map(el => {
+        const uid = el.deUid.replace(/[^a-zA-Z0-9]/g,'_');
+        const ouDetailRows = el.rows.map(r =>
+          `<tr><td>${r.orgUnitName}</td><td style="color:var(--muted);font-size:11px">${r.orgUnitUid}</td><td style="text-align:right">${n(r.value)}</td></tr>`
+        ).join('');
+        return `
+          <tr>
+            <td>${fmtDeName(el.deName)}</td>
+            <td class="mono" style="color:var(--muted);font-size:11px">${el.deUid}</td>
+            <td class="num">${n(el.total)}</td>
+            <td class="num">${el.orgUnitCount}</td>
+            <td><button class="de-expand-btn" id="de-btn-${uid}" onclick="toggleDeDetail('${uid}')">▶ expand</button></td>
+          </tr>
+          <tr class="de-detail-row" id="de-detail-${uid}">
+            <td colspan="5" style="padding:4px 12px 10px">
+              <div class="de-detail-panel">
+                <table style="width:100%">
+                  <thead><tr><th style="text-align:left">Org Unit</th><th style="text-align:left;color:var(--muted)">UID</th><th style="text-align:right">Value</th></tr></thead>
+                  <tbody>${ouDetailRows}</tbody>
+                </table>
+              </div>
+            </td>
+          </tr>`;
+      }).join('');
+
+      return `<div data-de-panel="${i}" style="display:${i===0?'block':'none'}">
+        <div class="preview-wrap">
+          <table>
+            <thead><tr><th>Data Element</th><th>DHIS2 UID</th><th class="num">Total</th><th class="num">Org Units</th><th></th></tr></thead>
+            <tbody>${rows || `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px">No data values for this dataset</td></tr>`}</tbody>
+          </table>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  const deCount = deData.reduce((s, ds) => s + ds.elements.length, 0);
+  const totalDEs = deCount > 0 ? ` (${deCount})` : '';
+
+  return `
+    <div class="card" style="margin-top:16px">
+      <div class="ds-tabs">
+        <button class="ds-tab active" data-tab="cadre" onclick="switchDataTab(this)">By Cadre</button>
+        <button class="ds-tab" data-tab="ou" onclick="switchDataTab(this)">Mapped Orgs${ou.length ? ' (' + ou.length + ')' : ''}</button>
+        <button class="ds-tab" data-tab="de" onclick="switchDataTab(this)">Data Elements${totalDEs}</button>
+      </div>
+
+      <div data-tab-panel="cadre">
+        <div class="preview-wrap">
+          <table>
+            <thead><tr><th>Cadre</th><th class="num">Active</th><th class="num">Left</th><th class="num">Recruited</th></tr></thead>
+            <tbody>
+              ${cadreRows}
+              <tr class="total-row">
+                <td>Total</td>
+                <td class="num">${n(sum(cadre,'active'))}</td>
+                <td class="num">${n(sum(cadre,'attrition'))}</td>
+                <td class="num">${n(sum(cadre,'recruited'))}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div data-tab-panel="ou" style="display:none">
+        <input class="filter-input" placeholder="Filter org units…" oninput="filterOrgTable(this)" />
+        <div class="ou-scroll">
+          <table>
+            <thead><tr><th>Org Unit</th><th>DHIS2 UID</th><th class="num">Active</th><th class="num">Left</th><th class="num">Recruited</th></tr></thead>
+            <tbody>${ouRows}</tbody>
+          </table>
+        </div>
+      </div>
+
+      <div data-tab-panel="de" style="display:none">
+        ${deData.length ? deTabsHtml + dePanelsHtml : '<div style="text-align:center;color:var(--muted);padding:40px">Run a sync to see data element detail</div>'}
+      </div>
+    </div>`;
+}
+
+function switchDataTab(btn) {
+  const card = btn.closest('.card');
+  card.querySelectorAll(':scope > .ds-tabs > .ds-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  const target = btn.dataset.tab;
+  card.querySelectorAll('[data-tab-panel]').forEach(p => {
+    p.style.display = p.dataset.tabPanel === target ? '' : 'none';
+  });
+}
+
+function switchDeDataset(btn, idx) {
+  const panel = btn.closest('[data-tab-panel]');
+  panel.querySelectorAll('.de-ds-tabs .ds-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  panel.querySelectorAll('[data-de-panel]').forEach(d => d.style.display = 'none');
+  const el = panel.querySelector(`[data-de-panel="${idx}"]`);
+  if (el) el.style.display = 'block';
+}
+
+function filterOrgTable(input) {
+  const term = input.value.toLowerCase();
+  input.closest('[data-tab-panel]').querySelectorAll('tbody tr').forEach(row => {
+    row.style.display = (row.cells[0]?.textContent || '').toLowerCase().includes(term) ? '' : 'none';
+  });
+}
+
+// ── VERIFY ────────────────────────────────────────────────────────────────────
+async function runVerify() {
+  const periodInput = document.getElementById('verify-period-input');
+  const period = periodInput.value.trim() || getCurrentQuarter();
+  periodInput.value = period;
+
+  const btn = event.target;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Querying…';
+  document.getElementById('verify-content').innerHTML =
+    '<div style="padding:20px;color:var(--muted)">Fetching from DHIS2…</div>';
+
+  try {
+    const res = await apiFetch(`/verify?period=${encodeURIComponent(period)}`);
+    if (!res) { btn.disabled = false; btn.innerHTML = '▶ Query DHIS2'; return; }
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Verify failed');
+    renderVerify(data);
+  } catch (e) {
+    document.getElementById('verify-content').innerHTML =
+      `<div style="color:var(--red);padding:20px">Error: ${e.message}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '▶ Query DHIS2';
+  }
+}
+
+function renderVerify(data) {
+  const el = document.getElementById('verify-content');
+  const n = v => Number(v || 0).toLocaleString();
+
+  const deNameFmt = key => {
+    const parts = key.replace(/^DE_/, '').split('_');
+    const statusKw = ['END', 'OF', 'YEAR', 'LEAVING', 'RECRUITED', 'BEGINNING'];
+    const splitIdx = parts.findIndex(p => statusKw.includes(p));
+    if (splitIdx > 0) {
+      const cadre = parts.slice(0, splitIdx).map(w => w[0] + w.slice(1).toLowerCase()).join(' ');
+      const status = parts.slice(splitIdx).map(w => w[0] + w.slice(1).toLowerCase()).join(' ');
+      return `${cadre} — ${status}`;
+    }
+    return parts.map(w => w[0] + w.slice(1).toLowerCase()).join(' ');
+  };
+
+  // Summary cards
+  const totalValues = data.datasets.reduce((s, ds) => s + (ds.totalValues || 0), 0);
+  const totalOrgUnits = new Set(
+    data.datasets.flatMap(ds => (ds.dataValues || []).map(dv => dv.orgUnit))
+  ).size;
+
+  const summaryCards = `
+    <div class="grid-3" style="margin-bottom:20px">
+      <div class="card">
+        <div class="card-title">Verified At</div>
+        <div class="card-value" style="font-size:16px">${new Date(data.verifiedAt).toLocaleTimeString()}</div>
+        <div class="card-sub">${new Date(data.verifiedAt).toLocaleDateString()}</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Stored Values</div>
+        <div class="card-value" style="color:var(--green)">${n(totalValues)}</div>
+        <div class="card-sub">Data values in DHIS2 for ${data.period}</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Org Units</div>
+        <div class="card-value">${totalOrgUnits}</div>
+        <div class="card-sub">Facilities with stored data</div>
+      </div>
+    </div>`;
+
+  // Per-dataset tabs
+  const dsKeys = data.datasets;
+  const tabHtml = dsKeys.map((ds, i) => `
+    <button class="ds-tab ${i===0?'active':''}" onclick="switchVerifyTab(this,${i})">
+      ${ds.label}
+      <span class="badge ${ds.totalValues>0?'badge-green':'badge-red'}" style="margin-left:6px">${ds.totalValues||0}</span>
+    </button>`).join('');
+
+  const tabContent = dsKeys.map((ds, i) => {
+    if (ds.error) {
+      return `<div data-vtab="${i}" style="display:${i===0?'block':'none'}">
+        <div style="color:var(--red);padding:16px">Error: ${ds.error}</div>
+      </div>`;
+    }
+    if (!ds.dataValues || ds.dataValues.length === 0) {
+      return `<div data-vtab="${i}" style="display:${i===0?'block':'none'}">
+        <div class="empty" style="padding:40px">
+          <div class="empty-icon">⚠️</div>
+          <div class="empty-title">No data found in DHIS2</div>
+          <div class="empty-sub">Dataset: <span class="mono">${ds.uid}</span> &nbsp;·&nbsp; Period: ${ds.period}</div>
+        </div>
+      </div>`;
+    }
+
+    // Group by org unit for a structured view
+    const byOU = {};
+    for (const dv of ds.dataValues) {
+      const key = dv.orgUnit;
+      if (!byOU[key]) byOU[key] = { name: dv.orgUnitName, uid: dv.orgUnit, values: [] };
+      byOU[key].values.push(dv);
+    }
+
+    const ouRows = Object.values(byOU).sort((a,b) => a.name.localeCompare(b.name)).map(ou => {
+      const subRows = ou.values.map(dv => `
+        <tr style="background:rgba(0,0,0,0.15)">
+          <td style="padding-left:28px;font-size:12px;color:var(--muted)">${deNameFmt(dv.dataElementName)}</td>
+          <td class="mono" style="font-size:11px;color:var(--muted)">${dv.dataElement}</td>
+          <td class="num" style="font-weight:600;color:var(--accent2)">${n(dv.value)}</td>
+          <td style="font-size:11px;color:var(--muted)">${dv.lastUpdated ? new Date(dv.lastUpdated).toLocaleString() : '—'}</td>
+          <td style="font-size:11px;color:var(--muted)">${dv.storedBy || '—'}</td>
+        </tr>`).join('');
+      return `
+        <tr style="cursor:pointer" onclick="toggleOuGroup(this)">
+          <td style="font-weight:500">▶ ${ou.name}</td>
+          <td class="mono" style="font-size:11px;color:var(--muted)">${ou.uid}</td>
+          <td class="num"><span class="badge badge-blue">${ou.values.length} values</span></td>
+          <td colspan="2"></td>
+        </tr>
+        <tr class="ou-sub-rows" style="display:none"><td colspan="5" style="padding:0">
+          <table style="width:100%">${subRows}</table>
+        </td></tr>`;
+    }).join('');
+
+    return `<div data-vtab="${i}" style="display:${i===0?'block':'none'}">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">
+        Dataset UID: <span class="mono">${ds.uid}</span> &nbsp;·&nbsp; Period: <span class="mono">${ds.period}</span> &nbsp;·&nbsp; ${ds.totalValues} values across ${Object.keys(byOU).length} org units
+      </div>
+      <input class="filter-input" placeholder="Filter org units…" oninput="filterVerifyTable(this)" />
+      <div class="ou-scroll">
+        <table>
+          <thead><tr>
+            <th>Org Unit</th>
+            <th>DHIS2 UID</th>
+            <th class="num">Values</th>
+            <th>Last Updated</th>
+            <th>Stored By</th>
+          </tr></thead>
+          <tbody>${ouRows}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    ${summaryCards}
+    <div class="card">
+      <div class="section-header" style="margin-bottom:14px">
+        <div><div class="section-title">Stored Data Values — ${data.period}</div></div>
+      </div>
+      <div class="ds-tabs">${tabHtml}</div>
+      ${tabContent}
+    </div>`;
+}
+
+function switchVerifyTab(btn, idx) {
+  const card = btn.closest('.card');
+  card.querySelectorAll(':scope > .ds-tabs > .ds-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  card.querySelectorAll('[data-vtab]').forEach(d => d.style.display = 'none');
+  const el = card.querySelector(`[data-vtab="${idx}"]`);
+  if (el) el.style.display = 'block';
+}
+
+function toggleOuGroup(row) {
+  const subRow = row.nextElementSibling;
+  if (!subRow) return;
+  const open = subRow.style.display !== 'none';
+  subRow.style.display = open ? 'none' : '';
+  const arrow = row.cells[0];
+  if (arrow) arrow.innerHTML = arrow.innerHTML.replace(open ? '▼' : '▶', open ? '▶' : '▼');
+}
+
+function filterVerifyTable(input) {
+  const term = input.value.toLowerCase();
+  const tbody = input.closest('[data-vtab]').querySelector('tbody');
+  if (!tbody) return;
+  const rows = [...tbody.querySelectorAll('tr')];
+  let i = 0;
+  while (i < rows.length) {
+    const row = rows[i];
+    if (row.classList.contains('ou-sub-rows')) { i++; continue; }
+    const text = (row.cells[0]?.textContent || '').toLowerCase();
+    const match = text.includes(term);
+    row.style.display = match ? '' : 'none';
+    // also hide the sub-rows of hidden parent
+    if (rows[i+1]?.classList.contains('ou-sub-rows')) {
+      rows[i+1].style.display = match ? rows[i+1].style.display : 'none';
+      i++;
+    }
+    i++;
+  }
+}
+
+// Auto-check health on load
+loadStatus();
+
+// ── LOGS ─────────────────────────────────────────────────────────────────────
+let _logEs = null;
+let _logAutoScroll = true;
+let _logLineCount = 0;
+const MAX_LOG_LINES = 2000;
+
+function showPage(name) {
+  // Override the above showPage — same implementation, plus log tab lifecycle
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  const tab = [...document.querySelectorAll('.nav-tab')].find(t =>
+    t.getAttribute('onclick')?.includes(`'${name}'`)
+  );
+  if (tab) tab.classList.add('active');
+
+  if (name === 'logs') {
+    startLogStream();
+  } else {
+    stopLogStream();
+  }
+}
+
+function setLogBadge(state, text) {
+  const el = document.getElementById('log-live-badge');
+  el.className = 'live-badge ' + state;
+  el.innerHTML = `<span class="live-dot"></span> ${text}`;
+}
+
+function startLogStream() {
+  if (_logEs) return; // already connected
+  setLogBadge('connected', 'Connecting…');
+
+  _logEs = new EventSource('/logs/stream', { withCredentials: true });
+
+  _logEs.onopen = () => setLogBadge('connected', 'Live');
+
+  _logEs.onmessage = (e) => {
+    let line;
+    try { line = JSON.parse(e.data); } catch { line = e.data; }
+    appendLogLine(line);
+  };
+
+  _logEs.onerror = () => {
+    setLogBadge('error', 'Reconnecting…');
+    // EventSource auto-reconnects; badge will update on next onopen
+  };
+}
+
+function stopLogStream() {
+  if (_logEs) { _logEs.close(); _logEs = null; }
+  setLogBadge('error', 'Disconnected');
+}
+
+function appendLogLine(raw) {
+  const box = document.getElementById('log-stream');
+
+  // Parse "[2026-06-22 11:31:20] INFO: some message"
+  const m = raw.match(/^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\] (INFO|WARN|ERROR|DEBUG): (.*)$/s);
+
+  let span;
+  if (m) {
+    const [, ts, lvl, msg] = m;
+    const lvlClass = lvl.toLowerCase();
+    span = document.createElement('span');
+    span.className = `ll ll-${lvlClass}`;
+    span.innerHTML =
+      `<span class="ll-ts">[${ts}]</span>` +
+      `<span class="ll-lvl ll-lvl-${lvlClass}">${lvl}:</span>` +
+      escHtml(msg);
+  } else {
+    span = document.createElement('span');
+    span.className = 'll ll-debug';
+    span.textContent = raw;
+  }
+
+  box.appendChild(span);
+  _logLineCount++;
+
+  // Trim oldest lines when over limit
+  while (box.children.length > MAX_LOG_LINES) {
+    box.removeChild(box.firstChild);
+  }
+
+  document.getElementById('log-line-count').textContent = `${box.children.length.toLocaleString()} lines`;
+
+  if (_logAutoScroll) {
+    box.scrollTop = box.scrollHeight;
+  }
+}
+
+function toggleLogScroll() {
+  _logAutoScroll = !_logAutoScroll;
+  const btn = document.getElementById('log-scroll-btn');
+  btn.textContent = _logAutoScroll ? '⏸ Pause scroll' : '▶ Resume scroll';
+  if (_logAutoScroll) {
+    const box = document.getElementById('log-stream');
+    box.scrollTop = box.scrollHeight;
+  }
+}
+
+function clearLogDisplay() {
+  document.getElementById('log-stream').innerHTML = '';
+  _logLineCount = 0;
+  document.getElementById('log-line-count').textContent = '';
+}
+
+// Resume auto-scroll when user scrolls to the bottom
+document.addEventListener('DOMContentLoaded', () => {
+  const box = document.getElementById('log-stream');
+  box.addEventListener('scroll', () => {
+    const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+    if (atBottom && !_logAutoScroll) {
+      _logAutoScroll = true;
+      document.getElementById('log-scroll-btn').textContent = '⏸ Pause scroll';
+    } else if (!atBottom && _logAutoScroll) {
+      _logAutoScroll = false;
+      document.getElementById('log-scroll-btn').textContent = '▶ Resume scroll';
+    }
+  });
+});
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>
