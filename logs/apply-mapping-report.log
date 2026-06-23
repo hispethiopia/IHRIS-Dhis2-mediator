@@ -1,0 +1,15 @@
+# apply-mapping report — 2026-06-18T07:32:55.454Z
+# Processed: 11, Dry Run: false
+
+ihris_id | ihris_name | dhis2_uid | result
+health-science-28 | Adama General Hospital and Medical College | eziZFKYyMo7 | HTTP_502
+159600 | Ambowuha Health Center | D2ZouTER10E | ERROR
+167449 | berga | qXM46Jb2GcM | ERROR
+159864 | degan health cenater | IxqmpcqdIL0 | ERROR
+dire-dawa-regional-health-bureau | Dire Dawa Regional Health Bureau | G9hDiPNoB7d | ERROR
+164675 | gorey health center | oQLHuQmCgpJ | ERROR
+159798 | Kallu Woreda Health Office | SbsV56ASSfV | ERROR
+68142 | kori hc | epsMzZdH4rr | ERROR
+181772 | Kumato | ZOIRxHTWOjY | ERROR
+159309 | Mekoy Health Center | SxHl2ayo3t4 | ERROR
+south-ethiopia-regional-health-bureau | South Ethiopia Regional Health Bureau | a2QIIR2UXcd | ERROR

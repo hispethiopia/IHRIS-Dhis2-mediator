@@ -1,0 +1,18 @@
+{
+  "68142": "epsMzZdH4rr",
+  "159309": "SxHl2ayo3t4",
+  "159600": "D2ZouTER10E",
+  "159798": "SbsV56ASSfV",
+  "159864": "IxqmpcqdIL0",
+  "161367": "kCBXEOvSPlI",
+  "164626": "G7MQUOujCYj",
+  "164675": "oQLHuQmCgpJ",
+  "167449": "qXM46Jb2GcM",
+  "181772": "ZOIRxHTWOjY",
+  "_comment": "Maps iHRIS Location IDs to DHIS2 org unit UIDs. Run 'npm run reconcile' to regenerate suggestions, fill 'approved_dhis2_uid', then run 'npm run build-mapping'.",
+  "health-science-28": "eziZFKYyMo7",
+  "dire-dawa-regional-health-bureau": "G9hDiPNoB7d",
+  "south-ethiopia-regional-health-bureau": "a2QIIR2UXcd",
+  "health-science-82": "C54yA16DjrI",
+  "federal-ministry-of-health": "b3aCK1PTn5S"
+}

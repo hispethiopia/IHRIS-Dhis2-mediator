@@ -1,0 +1,23 @@
+{
+  "name": "ihris-dhis2-mediator",
+  "version": "1.0.0",
+  "description": "OpenHIM Mediator: iHRIS v5 → DHIS2 HRH Data Push",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node --max-old-space-size=4096 src/index.js",
+    "dev": "nodemon --max-old-space-size=4096 src/index.js",
+    "reconcile": "node src/scripts/reconcile-locations.js",
+    "build-mapping": "node src/scripts/build-mapping.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "express": "^4.18.2",
+    "node-cron": "^3.0.3",
+    "openhim-mediator-utils": "0.4.0",
+    "winston": "^3.11.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}
