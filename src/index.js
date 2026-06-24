@@ -32,6 +32,10 @@ app.post("/auth/login", async (req, res) => {
   if (!username || !password) {
     return res.status(400).json({ ok: false, error: "Username and password required" });
   }
+  if (!process.env.IHRIS_BASE_URL) {
+    logger.error("IHRIS_BASE_URL is not set in .env");
+    return res.status(500).json({ ok: false, error: "Server misconfiguration: IHRIS_BASE_URL is not set" });
+  }
   try {
     const response = await axios.post(
       `${process.env.IHRIS_BASE_URL.replace("/fhir", "")}/auth/login`,
