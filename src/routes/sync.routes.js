@@ -14,6 +14,14 @@ const COMBINED_LOG = path.join(__dirname, "../../logs/combined.log");
 
 let lastSyncResult = null;
 let syncInProgress = false;
+const syncHistoryLog = [];
+const MAX_HISTORY = 100;
+
+function recordHistory(result) {
+  if (!result) return;
+  syncHistoryLog.unshift({ ...result, ranAt: result.completedAt || new Date().toISOString() });
+  if (syncHistoryLog.length > MAX_HISTORY) syncHistoryLog.pop();
+}
 
 /**
  * GET /health
@@ -60,6 +68,7 @@ router.get("/sync-hrh", requireAuth, async (req, res) => {
   syncInProgress = true;
   try {
     lastSyncResult = await runSync(period, dryRun, lastUpdated);
+    recordHistory(lastSyncResult);
     res.status(lastSyncResult.success ? 200 : 500).json(lastSyncResult);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -93,7 +102,7 @@ router.post("/sync-hrh", requireAuth, async (req, res) => {
 
   syncInProgress = true;
   runSync(period || null, !!dryRun, lastUpdated || null)
-    .then((r) => { lastSyncResult = r; })
+    .then((r) => { lastSyncResult = r; recordHistory(r); })
     .catch((err) => logger.error("Background sync error", { error: err.message }))
     .finally(() => { syncInProgress = false; });
 });
@@ -110,6 +119,14 @@ router.get("/sync-hrh/status", requireAuth, (req, res) => {
     return res.status(200).json({ status: "idle", message: "No sync has run yet" });
   }
   res.status(200).json({ status: "idle", lastSync: lastSyncResult });
+});
+
+/**
+ * GET /sync-hrh/history
+ * Returns the last N completed syncs (both UI and OpenHIM-triggered).
+ */
+router.get("/sync-hrh/history", requireAuth, (_req, res) => {
+  res.json(syncHistoryLog);
 });
 
 /**
@@ -193,6 +210,7 @@ module.exports.setLastSyncResult = (r) => { lastSyncResult = r; };
  * Used to confirm that a push actually landed in DHIS2.
  */
 router.get("/verify", requireAuth, async (req, res) => {
+  try {
   const dhis2Service = require("../services/dhis2.service");
   const period = req.query.period;
   if (!period) return res.status(400).json({ error: "period query param is required (e.g. ?period=2026Q2)" });
@@ -240,7 +258,8 @@ router.get("/verify", requireAuth, async (req, res) => {
     }
 
     // Enrich: resolve org unit and data element names
-    const enriched = rawValues.map(dv => ({
+    const MAX_VALUES = 5000;
+    const enriched = rawValues.slice(0, MAX_VALUES).map(dv => ({
       dataElement:     dv.dataElement,
       dataElementName: deUidToName[dv.dataElement] || dv.dataElement,
       orgUnit:         dv.orgUnit,
@@ -251,10 +270,19 @@ router.get("/verify", requireAuth, async (req, res) => {
       lastUpdated:     dv.lastUpdated,
     }));
 
-    results.push({ label: ds.label, uid: ds.uid, period, totalValues: enriched.length, dataValues: enriched });
+    results.push({
+      label: ds.label, uid: ds.uid, period,
+      totalValues: rawValues.length,
+      truncated: rawValues.length > MAX_VALUES,
+      dataValues: enriched,
+    });
   }
 
   res.json({ period, verifiedAt: new Date().toISOString(), datasets: results });
+  } catch (err) {
+    logger.error("Verify route error", { error: err.message, stack: err.stack });
+    if (!res.headersSent) res.status(500).json({ error: err.message });
+  }
 });
 
 /**

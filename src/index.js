@@ -84,6 +84,7 @@ if (process.env.REGISTER_MEDIATOR === "true") {
     username: process.env.OPENHIM_USERNAME,
     password: process.env.OPENHIM_PASSWORD,
     rejectUnauthorized: false,
+    urn: mediatorConfig.urn,
   };
   Promise.resolve()
     .then(() => { try { return require("openhim-mediator-utils"); } catch { return import("openhim-mediator-utils").then(m => m.default || m); } })

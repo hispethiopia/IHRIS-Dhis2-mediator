@@ -37,6 +37,9 @@ function parseSidCookie(req) {
 }
 
 function requireAuth(req, res, next) {
+  // Requests forwarded by OpenHIM carry this header — treat them as trusted internal calls
+  if (req.headers["x-openhim-transactionid"]) return next();
+
   const token = parseSidCookie(req);
   const sess = getSession(token);
   if (!sess) return res.status(401).json({ error: "Unauthorized — please sign in" });
