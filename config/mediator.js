@@ -6,7 +6,7 @@ module.exports = {
   description: "Pulls HRH data from iHRIS v5 FHIR API and pushes aggregate data to DHIS2",
   defaultChannelConfig: [
     {
-      name: "iHRIS to DHIS2 HRH Sync",
+      name: "iHRIS DHIS2 HRH Sync",
       urlPattern: "^/sync-hrh$",
       routes: [
         {
