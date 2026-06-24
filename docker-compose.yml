@@ -13,47 +13,8 @@ services:
       - openhim-net
     volumes:
       - ./logs:/app/logs
-    depends_on:
-      - openhim-core
-
-  # ─── OpenHIM Core (include if not already running externally) ───────────────
-  openhim-core:
-    image: jembi/openhim-core:latest
-    container_name: openhim-core
-    restart: unless-stopped
-    environment:
-      - mongo_url=mongodb://mongo:27017/openhim
-      - mongo_atnaUrl=mongodb://mongo:27017/openhim
-    ports:
-      - "8080:8080"   # API
-      - "5000:5000"   # HTTP channel
-      - "5001:5001"   # HTTPS channel
-    depends_on:
-      - mongo
-    networks:
-      - openhim-net
-
-  openhim-console:
-    image: jembi/openhim-console:latest
-    container_name: openhim-console
-    restart: unless-stopped
-    ports:
-      - "9000:80"
-    networks:
-      - openhim-net
-
-  mongo:
-    image: mongo:6
-    container_name: openhim-mongo
-    restart: unless-stopped
-    volumes:
-      - mongo_data:/data/db
-    networks:
-      - openhim-net
 
 networks:
   openhim-net:
-    driver: bridge
-
-volumes:
-  mongo_data:
+    external: true
+    name: openhim-common-main_openhim
