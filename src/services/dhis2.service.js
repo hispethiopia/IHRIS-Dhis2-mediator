@@ -57,10 +57,20 @@ async function pushDataValueSet(dataValueSet) {
   // Poll the task every 5 seconds; give up after DHIS2_TASK_TIMEOUT_MS (default 60 min).
   // With parallel dataset submission, tasks queue up in DHIS2 and the last one may not
   // start processing until 30+ minutes after submission — 20 min was too short.
+  //
+  // Empty-response detection: DHIS2 returns [] for unknown task IDs (e.g. after a restart
+  // wipes in-memory tasks). We fail fast instead of spinning for the full timeout.
   const POLL_MS  = 5000;
   const MAX_WAIT = parseInt(process.env.DHIS2_TASK_TIMEOUT_MS || String(60 * 60 * 1000), 10);
   const deadline = Date.now() + MAX_WAIT;
   let   done     = false;
+  // After the task has been seen at least once, 3 consecutive empty polls (15 s) means
+  // DHIS2 restarted and dropped the task.  Before it's ever been seen we allow 5 min
+  // (60 polls) in case DHIS2 is slow to queue large payloads.
+  let seenAny        = false;
+  let consecutiveEmpty = 0;
+  const MAX_EMPTY_AFTER_SEEN  = 3;
+  const MAX_EMPTY_NEVER_SEEN  = 60;
 
   while (Date.now() < deadline) {
     await new Promise(r => setTimeout(r, POLL_MS));
@@ -74,6 +84,25 @@ async function pushDataValueSet(dataValueSet) {
       continue;
     }
 
+    if (notifications.length === 0) {
+      consecutiveEmpty++;
+      const limit = seenAny ? MAX_EMPTY_AFTER_SEEN : MAX_EMPTY_NEVER_SEEN;
+      if (consecutiveEmpty >= limit) {
+        throw new Error(
+          `DHIS2 task ${taskId} ${seenAny ? "disappeared" : "never appeared"} after ` +
+          `${consecutiveEmpty * POLL_MS / 1000}s of empty responses — ` +
+          `DHIS2 may have restarted and lost the task. Re-run the sync.`
+        );
+      }
+      logger.warn(
+        `  Task ${taskId}: no notifications yet (${consecutiveEmpty}/${limit}) — ` +
+        (seenAny ? "task may have been lost" : "waiting for DHIS2 to start processing")
+      );
+      continue;
+    }
+
+    seenAny = true;
+    consecutiveEmpty = 0;
     done = notifications.some(n => n.completed === true);
     const lastMsg = notifications.slice(-1)[0]?.message || "working…";
     logger.info(`  Task ${taskId}: ${lastMsg}${done ? " ✓" : ""}`);

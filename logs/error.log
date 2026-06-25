@@ -43,3 +43,89 @@
 [2026-06-22 13:54:54] ERROR: [Woreda] Push failed: DHIS2 import task whA8GCEWfuQ did not complete within 60 minutes
 [2026-06-22 13:54:54] ERROR: [Basic Health Post] Push failed: DHIS2 import task bO0UwGFbMIj did not complete within 60 minutes
 [2026-06-22 13:54:54] ERROR: [Clinic] Push failed: DHIS2 import task j954APRQyfI did not complete within 60 minutes
+[2026-06-23 09:49:36] ERROR: Unhandled rejection {"reason":"AxiosError: Request failed with status code 404"}
+[2026-06-23 09:49:46] ERROR: Unhandled rejection {"reason":"AxiosError: Request failed with status code 404"}
+[2026-06-23 09:49:56] ERROR: Unhandled rejection {"reason":"AxiosError: Request failed with status code 404"}
+[2026-06-23 09:50:06] ERROR: Unhandled rejection {"reason":"AxiosError: Request failed with status code 404"}
+[2026-06-23 09:50:16] ERROR: Unhandled rejection {"reason":"AxiosError: Request failed with status code 404"}
+[2026-06-23 09:50:26] ERROR: Unhandled rejection {"reason":"AxiosError: Request failed with status code 404"}
+[2026-06-23 09:50:36] ERROR: Unhandled rejection {"reason":"AxiosError: Request failed with status code 404"}
+[2026-06-23 09:50:46] ERROR: Unhandled rejection {"reason":"AxiosError: Request failed with status code 404"}
+[2026-06-23 09:50:56] ERROR: Unhandled rejection {"reason":"AxiosError: Request failed with status code 404"}
+[2026-06-23 09:51:06] ERROR: Unhandled rejection {"reason":"AxiosError: Request failed with status code 404"}
+[2026-06-23 09:51:16] ERROR: Unhandled rejection {"reason":"AxiosError: Request failed with status code 404"}
+[2026-06-23 09:51:26] ERROR: Unhandled rejection {"reason":"AxiosError: Request failed with status code 404"}
+[2026-06-23 09:51:36] ERROR: Unhandled rejection {"reason":"AxiosError: Request failed with status code 404"}
+[2026-06-23 09:51:46] ERROR: Unhandled rejection {"reason":"AxiosError: Request failed with status code 404"}
+[2026-06-23 09:51:56] ERROR: Unhandled rejection {"reason":"AxiosError: Request failed with status code 404"}
+[2026-06-23 09:52:06] ERROR: Unhandled rejection {"reason":"AxiosError: Request failed with status code 404"}
+[2026-06-23 09:52:16] ERROR: Unhandled rejection {"reason":"AxiosError: Request failed with status code 404"}
+[2026-06-23 09:52:26] ERROR: Unhandled rejection {"reason":"AxiosError: Request failed with status code 404"}
+[2026-06-23 09:52:36] ERROR: Unhandled rejection {"reason":"AxiosError: Request failed with status code 404"}
+[2026-06-23 10:02:33] ERROR: Unhandled rejection {"reason":"Error: socket hang up"}
+[2026-06-23 10:02:40] ERROR: Unhandled rejection {"reason":"Error: connect ECONNREFUSED 127.0.0.1:8080"}
+[2026-06-23 10:46:15] ERROR: Cannot reach DHIS2 to validate dataset JKOfZFr4R5m: connect ECONNREFUSED 127.0.0.1:8090
+[2026-06-23 10:46:15] ERROR: Sync failed {"error":"DHIS2 is unreachable: connect ECONNREFUSED 127.0.0.1:8090","stack":"Error: DHIS2 is unreachable: connect ECONNREFUSED 127.0.0.1:8090\n    at Object.validateDataset (/home/michael/Downloads/ihris-dhis2-mediator (3)/ihris-dhis2-mediator/src/services/dhis2.service.js:286:13)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async Promise.all (index 0)\n    at async runSync (/home/michael/Downloads/ihris-dhis2-mediator (3)/ihris-dhis2-mediator/src/services/sync.service.js:74:31)\n    at async /home/michael/Downloads/ihris-dhis2-mediator (3)/ihris-dhis2-mediator/src/routes/sync.routes.js:62:22"}
+[2026-06-23 10:46:15] ERROR: Cannot reach DHIS2 to validate dataset lqwZa8PXmKU: connect ECONNREFUSED 127.0.0.1:8090
+[2026-06-23 10:46:15] ERROR: Cannot reach DHIS2 to validate dataset COwNnyyYSmp: connect ECONNREFUSED 127.0.0.1:8090
+[2026-06-23 10:46:15] ERROR: Cannot reach DHIS2 to validate dataset k4b76SeWTSo: connect ECONNREFUSED 127.0.0.1:8090
+[2026-06-23 10:46:15] ERROR: Cannot reach DHIS2 to validate dataset Dt7o9eU9F6s: connect ECONNREFUSED 127.0.0.1:8090
+[2026-06-23 10:46:15] ERROR: Cannot reach DHIS2 to validate dataset pFr7FEZlEKF: connect ECONNREFUSED 127.0.0.1:8090
+[2026-06-23 10:46:15] ERROR: Cannot reach DHIS2 to validate dataset DmP9l7qdnUy: connect ECONNREFUSED 127.0.0.1:8090
+[2026-06-23 10:46:15] ERROR: Cannot reach DHIS2 to validate dataset eaHbCxq65to: connect ECONNREFUSED 127.0.0.1:8090
+[2026-06-23 10:49:10] ERROR: Cannot reach DHIS2 to validate dataset JKOfZFr4R5m: connect ECONNREFUSED 127.0.0.1:8090
+[2026-06-23 10:49:10] ERROR: Sync failed {"error":"DHIS2 is unreachable: connect ECONNREFUSED 127.0.0.1:8090","stack":"Error: DHIS2 is unreachable: connect ECONNREFUSED 127.0.0.1:8090\n    at Object.validateDataset (/home/michael/Downloads/ihris-dhis2-mediator (3)/ihris-dhis2-mediator/src/services/dhis2.service.js:286:13)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async Promise.all (index 0)\n    at async runSync (/home/michael/Downloads/ihris-dhis2-mediator (3)/ihris-dhis2-mediator/src/services/sync.service.js:74:31)\n    at async /home/michael/Downloads/ihris-dhis2-mediator (3)/ihris-dhis2-mediator/src/routes/sync.routes.js:62:22"}
+[2026-06-23 10:49:10] ERROR: Cannot reach DHIS2 to validate dataset lqwZa8PXmKU: connect ECONNREFUSED 127.0.0.1:8090
+[2026-06-23 10:49:10] ERROR: Cannot reach DHIS2 to validate dataset COwNnyyYSmp: connect ECONNREFUSED 127.0.0.1:8090
+[2026-06-23 10:49:10] ERROR: Cannot reach DHIS2 to validate dataset k4b76SeWTSo: connect ECONNREFUSED 127.0.0.1:8090
+[2026-06-23 10:49:10] ERROR: Cannot reach DHIS2 to validate dataset Dt7o9eU9F6s: connect ECONNREFUSED 127.0.0.1:8090
+[2026-06-23 10:49:10] ERROR: Cannot reach DHIS2 to validate dataset pFr7FEZlEKF: connect ECONNREFUSED 127.0.0.1:8090
+[2026-06-23 10:49:10] ERROR: Cannot reach DHIS2 to validate dataset DmP9l7qdnUy: connect ECONNREFUSED 127.0.0.1:8090
+[2026-06-23 10:49:10] ERROR: Cannot reach DHIS2 to validate dataset eaHbCxq65to: connect ECONNREFUSED 127.0.0.1:8090
+[2026-06-23 10:49:15] ERROR: Cannot reach DHIS2 to validate dataset JKOfZFr4R5m: connect ECONNREFUSED 127.0.0.1:8090
+[2026-06-23 10:49:15] ERROR: Sync failed {"error":"DHIS2 is unreachable: connect ECONNREFUSED 127.0.0.1:8090","stack":"Error: DHIS2 is unreachable: connect ECONNREFUSED 127.0.0.1:8090\n    at Object.validateDataset (/home/michael/Downloads/ihris-dhis2-mediator (3)/ihris-dhis2-mediator/src/services/dhis2.service.js:286:13)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async Promise.all (index 0)\n    at async runSync (/home/michael/Downloads/ihris-dhis2-mediator (3)/ihris-dhis2-mediator/src/services/sync.service.js:74:31)\n    at async /home/michael/Downloads/ihris-dhis2-mediator (3)/ihris-dhis2-mediator/src/routes/sync.routes.js:62:22"}
+[2026-06-23 10:49:15] ERROR: Cannot reach DHIS2 to validate dataset lqwZa8PXmKU: connect ECONNREFUSED 127.0.0.1:8090
+[2026-06-23 10:49:15] ERROR: Cannot reach DHIS2 to validate dataset COwNnyyYSmp: connect ECONNREFUSED 127.0.0.1:8090
+[2026-06-23 10:49:15] ERROR: Cannot reach DHIS2 to validate dataset k4b76SeWTSo: connect ECONNREFUSED 127.0.0.1:8090
+[2026-06-23 10:49:15] ERROR: Cannot reach DHIS2 to validate dataset Dt7o9eU9F6s: connect ECONNREFUSED 127.0.0.1:8090
+[2026-06-23 10:49:15] ERROR: Cannot reach DHIS2 to validate dataset pFr7FEZlEKF: connect ECONNREFUSED 127.0.0.1:8090
+[2026-06-23 10:49:15] ERROR: Cannot reach DHIS2 to validate dataset DmP9l7qdnUy: connect ECONNREFUSED 127.0.0.1:8090
+[2026-06-23 10:49:15] ERROR: Cannot reach DHIS2 to validate dataset eaHbCxq65to: connect ECONNREFUSED 127.0.0.1:8090
+[2026-06-24 10:08:03] ERROR: Login proxy error {"error":"Cannot read properties of undefined (reading 'replace')"}
+[2026-06-24 10:08:12] ERROR: Login proxy error {"error":"Cannot read properties of undefined (reading 'replace')"}
+[2026-06-24 10:08:14] ERROR: Login proxy error {"error":"Cannot read properties of undefined (reading 'replace')"}
+[2026-06-24 10:08:14] ERROR: Login proxy error {"error":"Cannot read properties of undefined (reading 'replace')"}
+[2026-06-24 10:08:15] ERROR: Login proxy error {"error":"Cannot read properties of undefined (reading 'replace')"}
+[2026-06-24 07:45:07] ERROR: Cannot reach DHIS2 to validate dataset JKOfZFr4R5m: 
+[2026-06-24 07:45:07] ERROR: Sync failed {"error":"DHIS2 is unreachable: ","stack":"Error: DHIS2 is unreachable: \n    at Object.validateDataset (/app/src/services/dhis2.service.js:286:13)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async Promise.all (index 0)\n    at async runSync (/app/src/services/sync.service.js:74:31)\n    at async /app/src/routes/sync.routes.js:70:22"}
+[2026-06-24 07:45:07] ERROR: Cannot reach DHIS2 to validate dataset lqwZa8PXmKU: 
+[2026-06-24 07:45:07] ERROR: Cannot reach DHIS2 to validate dataset COwNnyyYSmp: 
+[2026-06-24 07:45:07] ERROR: Cannot reach DHIS2 to validate dataset k4b76SeWTSo: 
+[2026-06-24 07:45:07] ERROR: Cannot reach DHIS2 to validate dataset Dt7o9eU9F6s: 
+[2026-06-24 07:45:07] ERROR: Cannot reach DHIS2 to validate dataset pFr7FEZlEKF: 
+[2026-06-24 07:45:07] ERROR: Cannot reach DHIS2 to validate dataset DmP9l7qdnUy: 
+[2026-06-24 07:45:07] ERROR: Cannot reach DHIS2 to validate dataset eaHbCxq65to: 
+[2026-06-24 07:51:26] ERROR: Login proxy error {"error":"getaddrinfo EAI_AGAIN hra.moh.gov.et"}
+[2026-06-24 07:55:42] ERROR: Cannot reach DHIS2 to validate dataset eaHbCxq65to: connect ETIMEDOUT 172.18.0.1:8090
+[2026-06-24 07:55:42] ERROR: Sync failed {"error":"DHIS2 is unreachable: connect ETIMEDOUT 172.18.0.1:8090","stack":"Error: DHIS2 is unreachable: connect ETIMEDOUT 172.18.0.1:8090\n    at Object.validateDataset (/app/src/services/dhis2.service.js:286:13)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async Promise.all (index 7)\n    at async runSync (/app/src/services/sync.service.js:74:31)\n    at async /app/src/routes/sync.routes.js:70:22"}
+[2026-06-24 07:55:42] ERROR: Cannot reach DHIS2 to validate dataset DmP9l7qdnUy: connect ETIMEDOUT 172.18.0.1:8090
+[2026-06-24 07:55:42] ERROR: Cannot reach DHIS2 to validate dataset pFr7FEZlEKF: connect ETIMEDOUT 172.18.0.1:8090
+[2026-06-24 07:55:42] ERROR: Cannot reach DHIS2 to validate dataset Dt7o9eU9F6s: connect ETIMEDOUT 172.18.0.1:8090
+[2026-06-24 07:55:42] ERROR: Cannot reach DHIS2 to validate dataset k4b76SeWTSo: connect ETIMEDOUT 172.18.0.1:8090
+[2026-06-24 07:55:42] ERROR: Cannot reach DHIS2 to validate dataset COwNnyyYSmp: connect ETIMEDOUT 172.18.0.1:8090
+[2026-06-24 07:55:42] ERROR: Cannot reach DHIS2 to validate dataset lqwZa8PXmKU: connect ETIMEDOUT 172.18.0.1:8090
+[2026-06-24 07:55:42] ERROR: Cannot reach DHIS2 to validate dataset JKOfZFr4R5m: connect ETIMEDOUT 172.18.0.1:8090
+[2026-06-24 10:56:12] ERROR: OpenHIM registration failed {"error":"getaddrinfo EAI_AGAIN openhim-core"}
+[2026-06-24 10:58:36] ERROR: Cannot reach DHIS2 to validate dataset lqwZa8PXmKU: getaddrinfo ENOTFOUND host.docker.internal
+[2026-06-24 10:58:36] ERROR: Sync failed {"error":"DHIS2 is unreachable: getaddrinfo ENOTFOUND host.docker.internal","stack":"Error: DHIS2 is unreachable: getaddrinfo ENOTFOUND host.docker.internal\n    at Object.validateDataset (/home/michael/Downloads/ihris-dhis2-mediator (3)/ihris-dhis2-mediator/src/services/dhis2.service.js:286:13)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async Promise.all (index 1)\n    at async runSync (/home/michael/Downloads/ihris-dhis2-mediator (3)/ihris-dhis2-mediator/src/services/sync.service.js:74:31)"}
+[2026-06-24 10:58:36] ERROR: Cannot reach DHIS2 to validate dataset JKOfZFr4R5m: getaddrinfo ENOTFOUND host.docker.internal
+[2026-06-24 10:58:36] ERROR: Cannot reach DHIS2 to validate dataset COwNnyyYSmp: getaddrinfo ENOTFOUND host.docker.internal
+[2026-06-24 10:58:36] ERROR: Cannot reach DHIS2 to validate dataset k4b76SeWTSo: getaddrinfo ENOTFOUND host.docker.internal
+[2026-06-24 10:58:36] ERROR: Cannot reach DHIS2 to validate dataset Dt7o9eU9F6s: getaddrinfo ENOTFOUND host.docker.internal
+[2026-06-24 10:58:36] ERROR: Cannot reach DHIS2 to validate dataset pFr7FEZlEKF: getaddrinfo ENOTFOUND host.docker.internal
+[2026-06-24 10:58:36] ERROR: Cannot reach DHIS2 to validate dataset DmP9l7qdnUy: getaddrinfo ENOTFOUND host.docker.internal
+[2026-06-24 10:58:36] ERROR: Cannot reach DHIS2 to validate dataset eaHbCxq65to: getaddrinfo ENOTFOUND host.docker.internal
+[2026-06-25 12:50:50] ERROR: Login proxy error {"error":"Request failed with status code 401"}
+[2026-06-25 12:50:51] ERROR: Login proxy error {"error":"Request failed with status code 401"}
+[2026-06-25 12:50:52] ERROR: Login proxy error {"error":"Request failed with status code 401"}
+[2026-06-25 16:11:55] ERROR: Login proxy error {"error":"Request failed with status code 401"}

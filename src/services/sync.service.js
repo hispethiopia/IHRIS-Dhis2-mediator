@@ -85,10 +85,10 @@ async function runSync(period, dryRun = false, lastUpdated = null) {
       dhis2Service.fetchGenderCategoryOptionCombos(),
     ]);
     const orgUnitDatasets = dhis2Service.getOrgUnitDatasets();
-    result.steps.orgUnits = Object.keys(orgUnitMap).length;
+    result.steps.orgUnits = Object.keys(dhis2Service.getOrgUnitNames()).length;
     result.steps.orgUnitsWithDataset = Object.keys(orgUnitDatasets).length;
     result.steps.categoryOptionCombos = categoryOptionCombos;
-    logger.info(`Loaded ${result.steps.orgUnits} org unit mappings (${result.steps.orgUnitsWithDataset} with facility dataset), COCs — Male: ${categoryOptionCombos.male}, Female: ${categoryOptionCombos.female}`);
+    logger.info(`Loaded ${result.steps.orgUnits} org units (${result.steps.orgUnitsWithDataset} with facility dataset), COCs — Male: ${categoryOptionCombos.male}, Female: ${categoryOptionCombos.female}`);
 
     // ── Steps 3+4: Extract from iHRIS and transform (two-pass) ──────────────
     // Pass 1: stream roles to collect unique practitioner IDs (no processing yet).
@@ -204,17 +204,18 @@ async function runSync(period, dryRun = false, lastUpdated = null) {
       result.steps.push = "DRY_RUN";
       result.success = true;
     } else {
-      logger.info("Step 5/5 — Pushing to DHIS2 (all datasets in parallel)...");
+      logger.info("Step 5/5 — Pushing to DHIS2 (one dataset at a time)...");
 
-      // Push all datasets simultaneously — time = slowest single dataset, not sum of all.
-      const settlements = await Promise.allSettled(
-        dataValueSets.map(async (dvs) => {
-          if (dvs.dataValues.length === 0) {
-            logger.warn(`[${dvs.label}] No data values — skipping push`);
-            return { label: dvs.label, status: "SKIPPED" };
-          }
+      const importResults = [];
+      for (const dvs of dataValueSets) {
+        if (dvs.dataValues.length === 0) {
+          logger.warn(`[${dvs.label}] No data values — skipping push`);
+          importResults.push({ label: dvs.label, status: "SKIPPED" });
+          continue;
+        }
 
-          logger.info(`  Pushing [${dvs.label}]: ${dvs.dataValues.length} values...`);
+        logger.info(`  Pushing [${dvs.label}]: ${dvs.dataValues.length} values...`);
+        try {
           const summary = await dhis2Service.pushDataValueSet({
             dataSet: dvs.dataSet,
             period: dvs.period,
@@ -225,24 +226,19 @@ async function runSync(period, dryRun = false, lastUpdated = null) {
             logger.error(`[${dvs.label}] DHIS2 returned ERROR status`, { summary });
           }
 
-          return {
+          importResults.push({
             label: dvs.label,
             status: summary.status,
             imported: summary.importCount?.imported,
             updated: summary.importCount?.updated,
             ignored: summary.importCount?.ignored,
             conflicts: summary.conflicts?.length || 0,
-          };
-        })
-      );
-
-      const importResults = settlements.map((s, i) => {
-        if (s.status === "rejected") {
-          logger.error(`[${dataValueSets[i].label}] Push failed: ${s.reason?.message}`);
-          return { label: dataValueSets[i].label, status: "ERROR", error: s.reason?.message };
+          });
+        } catch (err) {
+          logger.error(`[${dvs.label}] Push failed: ${err.message}`);
+          importResults.push({ label: dvs.label, status: "ERROR", error: err.message });
         }
-        return s.value;
-      });
+      }
 
       result.steps.push = importResults;
       result.success = importResults.every(

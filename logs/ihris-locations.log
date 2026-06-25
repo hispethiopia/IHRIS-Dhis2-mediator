@@ -1,4 +1,4 @@
-# iHRIS Facilities log — generated 2026-06-22T13:57:51.227Z
+# iHRIS Facilities log — generated 2026-06-25T13:15:08.260Z
 # Total: 5000 Location resources (2 page(s))
 # Columns: STATUS | IN_USE | DHIS2_UID       | iHRIS_ID                             | Name                                               | Physical Type
 # STATUS: DHIS2 = has DHIS2 UID (syncs to DHIS2), LOCAL = no DHIS2 UID (skipped during sync)

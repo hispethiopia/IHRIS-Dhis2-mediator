@@ -13,6 +13,8 @@ services:
       - openhim-net
     volumes:
       - ./logs:/app/logs
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 networks:
   openhim-net:
