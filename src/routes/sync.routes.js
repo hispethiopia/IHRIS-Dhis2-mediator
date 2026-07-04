@@ -212,8 +212,12 @@ module.exports.setLastSyncResult = (r) => { lastSyncResult = r; };
 router.get("/verify", requireAuth, async (req, res) => {
   try {
   const dhis2Service = require("../services/dhis2.service");
-  const period = req.query.period;
-  if (!period) return res.status(400).json({ error: "period query param is required (e.g. ?period=2026Q2)" });
+  const { toDhis2Period } = require("../utils/ethiopian-calendar");
+  const requestedPeriod = req.query.period;
+  if (!requestedPeriod) return res.status(400).json({ error: "period query param is required (e.g. ?period=2026Q2)" });
+  // Annual periods (e.g. "2018") are stored in DHIS2 as Financial-November
+  // periods ("2018Nov") — convert so verify queries what was actually pushed.
+  const period = toDhis2Period(requestedPeriod);
 
   // Build DE UID → env key name map
   const deUidToName = {};
