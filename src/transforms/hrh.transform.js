@@ -13,7 +13,7 @@
 const path   = require("path");
 const fs     = require("fs");
 const logger = require("../logger");
-const { parseEthiopianPeriod } = require("../utils/ethiopian-calendar");
+const { parseEthiopianPeriod, toDhis2Period } = require("../utils/ethiopian-calendar");
 
 // Local iHRIS-ID → DHIS2 UID overrides (for locations not yet linked in iHRIS)
 let _locationMapping = null;
@@ -145,6 +145,10 @@ const parsePeriod = parseEthiopianPeriod;
 // Takes the four accumulated bucket maps and builds the final output.
 // ─────────────────────────────────────────────────────────────────────────────
 function _buildResults(period, beginningBuckets, activeBuckets, attritionBuckets, recruitedBuckets, categoryOptionCombos, orgUnitDatasets, orgUnitNames) {
+  // DHIS2 period id actually sent on the wire (annual periods get the "Nov"
+  // financial-year suffix; quarterly/monthly periods pass through unchanged).
+  const dhis2Period = toDhis2Period(period);
+
   const GENDER_COCS = [
     { key: "male",   coc: categoryOptionCombos.male },
     { key: "female", coc: categoryOptionCombos.female },
@@ -196,7 +200,7 @@ function _buildResults(period, beginningBuckets, activeBuckets, attritionBuckets
         for (const { key: genderKey, coc } of GENDER_COCS) {
           if (!coc) continue;
           const value = counts[key]?.[genderKey] || 0;
-          byDs[dsId].push({ dataElement: deUid, orgUnit: orgUid, period, value: String(value), categoryOptionCombo: coc });
+          byDs[dsId].push({ dataElement: deUid, orgUnit: orgUid, period: dhis2Period, value: String(value), categoryOptionCombo: coc });
         }
       }
     }
@@ -219,7 +223,7 @@ function _buildResults(period, beginningBuckets, activeBuckets, attritionBuckets
   const dataValueSets = Object.entries(mergedByDs).map(([dsId, dataValues]) => ({
     label:      DATASET_LABELS[dsId] || dsId,
     dataSet:    dsId,
-    period,
+    period:     dhis2Period,
     dataValues,
   }));
 

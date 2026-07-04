@@ -122,10 +122,25 @@ function gregorianPeriodToEthiopian(period) {
   );
 }
 
+/**
+ * Convert an internal Ethiopian annual period ("2018") to the period id DHIS2
+ * expects on the wire.
+ *
+ * The DHIS2 datasets here are configured with the "Financial Year (November)"
+ * period type, whose annual period ids are suffixed "Nov" (e.g. "2018Nov" =
+ * Nov 2018 – Oct 2019 in the FY calendar) rather than a bare "2018". Quarterly
+ * ("2018Q3") and monthly ("201809") periods are untouched — those already use
+ * standard DHIS2 period types.
+ */
+function toDhis2Period(period) {
+  return /^\d{4}$/.test(period) ? `${period}Nov` : period;
+}
+
 module.exports = {
   ethiopianNewYearGregorian,
   gregorianToEthiopianYear,
   getCurrentEthiopianYear,
   parseEthiopianPeriod,
   gregorianPeriodToEthiopian,
+  toDhis2Period,
 };

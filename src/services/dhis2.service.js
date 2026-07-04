@@ -178,9 +178,28 @@ async function fetchOrgUnitMap(forceRefresh = false) {
   const dsIds = getAllDatasetIds();
   logger.info(`Fetching org units from ${dsIds.length} HR datasets (facility + admin levels)...`);
 
-  const map       = {};
-  const nameMap   = {};
+  // Priority order: when an org unit appears in multiple datasets, the dataset
+  // with the lowest priority number wins. Hospital (1) beats Health Center (2),
+  // etc. This handles cases where DHIS2 has an org unit assigned to more than
+  // one HR dataset — without a defined priority, Promise.all's non-deterministic
+  // response order would assign the org unit to whichever dataset responded first.
+  const DATASET_PRIORITY = {};
+  const priorityList = [
+    process.env.DHIS2_DATASET_HOSPITAL,
+    process.env.DHIS2_DATASET_HEALTH_CENTER,
+    process.env.DHIS2_DATASET_CLINIC,
+    process.env.DHIS2_DATASET_COMP_HP,
+    process.env.DHIS2_DATASET_BASIC_HP,
+    process.env.DHIS2_DATASET_WOREDA,
+    process.env.DHIS2_DATASET_ZONE,
+    process.env.DHIS2_DATASET_REGION,
+  ];
+  priorityList.forEach((id, i) => { if (id) DATASET_PRIORITY[id] = i + 1; });
+
+  const map        = {};
+  const nameMap    = {};
   const datasetMap = {};
+  const conflicts  = {}; // uid → [dsIds] for logging
 
   // Fetch each dataset's assigned org units in parallel
   const responses = await Promise.all(
@@ -200,8 +219,31 @@ async function fetchOrgUnitMap(forceRefresh = false) {
       if (ou.code) map[ou.code] = ou.id;
       map[ou.name] = ou.id;
       nameMap[ou.id] = ou.name;
-      // First dataset seen wins (org unit should only belong to one HR dataset type)
-      if (!datasetMap[ou.id]) datasetMap[ou.id] = dsId;
+
+      if (!datasetMap[ou.id]) {
+        datasetMap[ou.id] = dsId;
+      } else if (datasetMap[ou.id] !== dsId) {
+        // Conflict: org unit belongs to more than one HR dataset in DHIS2.
+        // Keep whichever has the higher priority (lower number).
+        if (!conflicts[ou.id]) conflicts[ou.id] = [datasetMap[ou.id]];
+        conflicts[ou.id].push(dsId);
+
+        const existingPriority = DATASET_PRIORITY[datasetMap[ou.id]] ?? 999;
+        const newPriority      = DATASET_PRIORITY[dsId]              ?? 999;
+        if (newPriority < existingPriority) {
+          datasetMap[ou.id] = dsId;
+        }
+      }
+    }
+  }
+
+  if (Object.keys(conflicts).length > 0) {
+    logger.warn(
+      `${Object.keys(conflicts).length} org unit(s) are assigned to multiple HR datasets in DHIS2 — ` +
+      `resolved using priority order (Hospital > Health Center > Clinic > Comp HP > Basic HP > Woreda > Zone > Region):`
+    );
+    for (const [uid, dsIds] of Object.entries(conflicts)) {
+      logger.warn(`  ${nameMap[uid] || uid} (${uid}): datasets [${dsIds.join(", ")}] → assigned to ${datasetMap[uid]}`);
     }
   }
 
@@ -343,9 +385,20 @@ async function getRootOrgUnitId() {
  * Uses the root org unit with children=true to fetch all data in one request,
  * avoiding URL-length issues from passing thousands of org unit UIDs.
  * Returns an array of raw data value objects.
+ *
+ * IMPORTANT: DHIS2's /dataValueSets?dataSet=X returns values based on data element
+ * membership in dataset X, NOT on which org units are assigned to X. All 5 facility
+ * datasets share the same data element UIDs, so without filtering, a hospital's data
+ * would appear when querying the Health Center, Basic HP, etc. datasets. We filter
+ * the result to only org units that are actually assigned to the queried dataset.
  */
 async function fetchStoredDataValues(dataSetId, period, _orgUnitUids = []) {
   const client = getClient();
+
+  // Ensure org unit map is loaded so we can filter by dataset assignment below.
+  if (!_orgUnitMapCache) {
+    await fetchOrgUnitMap();
+  }
 
   // Use root org unit + children=true (one request, avoids URL length limits)
   const rootOu = await getRootOrgUnitId();
@@ -361,14 +414,35 @@ async function fetchStoredDataValues(dataSetId, period, _orgUnitUids = []) {
     return [];
   }
 
-  return response.data.dataValues || [];
+  const allValues = response.data.dataValues || [];
+
+  // Filter to only org units assigned to this specific dataset.
+  // Without this, a hospital's values appear in Health Center / Health Post / Clinic
+  // queries too because those datasets contain the same data element UIDs.
+  const assignedOrgUnits = new Set(getOrgUnitsForDataset(dataSetId));
+  if (assignedOrgUnits.size === 0) {
+    // Org unit map not yet built or dataset has no org units — return unfiltered
+    return allValues;
+  }
+
+  const filtered = allValues.filter(v => assignedOrgUnits.has(v.orgUnit));
+
+  if (filtered.length !== allValues.length) {
+    logger.info(
+      `[verify] ${dataSetId}: filtered ${allValues.length} → ${filtered.length} values ` +
+      `(removed ${allValues.length - filtered.length} belonging to org units not in this dataset)`
+    );
+  }
+
+  return filtered;
 }
 
 function clearOrgUnitCache() {
   _orgUnitMapCache = null;
   _orgUnitCachedAt = 0;
-  _orgUnitNames = {};
+  _orgUnitNames    = {};
   _orgUnitDatasets = {};
+  logger.info("Org unit cache cleared — next sync will re-fetch from DHIS2");
 }
 
 module.exports = {
