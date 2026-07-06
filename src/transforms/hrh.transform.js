@@ -122,16 +122,27 @@ function resolveCadre(role) {
 
 /**
  * Resolve DHIS2 org unit UID from PractitionerRole.location reference.
- * iHRIS stores location as "Location/DHIS2-{orgUnitUID}" — strip the prefix.
+ *
+ * Priority order:
+ *  1. locationDhis2Map — authoritative iHRIS Location.identifier[dhis2Id] lookup
+ *     (see ihris.service.js#fetchLocationDhis2Map). Present on every facility
+ *     regardless of region; doesn't depend on name matching so it can't collide
+ *     with a same-named facility in a different woreda.
+ *  2. "DHIS2-{uid}" id-prefix convention (cheap, no map needed, kept as a
+ *     fallback in case locationDhis2Map wasn't supplied, e.g. batch/debug paths).
+ *  3. orgUnitMap — matches DHIS2's dataset-assigned org units by code/name.
+ *  4. config/location-mapping.json — manual overrides for anything still unresolved.
  */
-function resolveOrgUnit(role, orgUnitMap) {
+function resolveOrgUnit(role, orgUnitMap, locationDhis2Map = null) {
   const ref = role.location?.[0]?.reference || "";
   const id = ref.split("/").pop();
   const display = role.location?.[0]?.display || "";
 
+  const mapped = locationDhis2Map?.get(id);
+  if (mapped) return mapped;
+
   if (id.startsWith("DHIS2-")) return id.replace("DHIS2-", "");
 
-  // Check DHIS2 org unit map (from dataset assignments) first, then local override file
   return orgUnitMap[id] || orgUnitMap[display] || getLocationMapping()[id] || getLocationMapping()[display] || null;
 }
 
@@ -269,7 +280,7 @@ function _buildResults(period, beginningBuckets, activeBuckets, attritionBuckets
 // any given time. Pages are GC-eligible as soon as processPage() returns.
 // ─────────────────────────────────────────────────────────────────────────────
 class TransformSession {
-  constructor(orgUnitMap, period, categoryOptionCombos = {}, orgUnitDatasets = {}) {
+  constructor(orgUnitMap, period, categoryOptionCombos = {}, orgUnitDatasets = {}, locationDhis2Map = null) {
     const { start, end } = parsePeriod(period);
     this._period      = period;
     this._periodStart = start;
@@ -277,6 +288,7 @@ class TransformSession {
     this._orgUnitMap  = orgUnitMap;
     this._cocs        = categoryOptionCombos;
     this._dsMap       = orgUnitDatasets;
+    this._locMap      = locationDhis2Map;
 
     // Buckets: { orgUid → { CADRE_KEY → { male: 0, female: 0 } } }
     this._beginning = {};
@@ -298,7 +310,7 @@ class TransformSession {
    * After this returns, the roles array is no longer referenced here and can be GC'd.
    */
   processPage(roles, genderMap) {
-    const { _periodStart: ps, _periodEnd: pe, _orgUnitMap: om, _dsMap: ds } = this;
+    const { _periodStart: ps, _periodEnd: pe, _orgUnitMap: om, _dsMap: ds, _locMap: lm } = this;
 
     const ensure = (store, uid) => {
       if (!store[uid]) {
@@ -308,7 +320,7 @@ class TransformSession {
     };
 
     for (const role of roles) {
-      const orgUid = resolveOrgUnit(role, om);
+      const orgUid = resolveOrgUnit(role, om, lm);
       if (!orgUid) { this._noOrgUnit++; continue; }
       if (!ds[orgUid]) { this._noDataset++; this._noDatasetSet.add(orgUid); continue; }
 
@@ -365,9 +377,10 @@ class TransformSession {
  * @param {{ male: string, female: string }} categoryOptionCombos  COC UIDs by gender
  * @param {Object} orgUnitNames      { uid → displayName }
  * @param {Object} orgUnitDatasets   { uid → facilityDatasetId }
+ * @param {Map}    [locationDhis2Map] iHRIS Location ID → DHIS2 UID (see resolveOrgUnit)
  * @returns {{ dataValueSets, cadreSummary, orgUnitBreakdown }}
  */
-function transformToDhis2(practitionerRoles, practitioners, orgUnitMap, period, categoryOptionCombos = {}, orgUnitNames = {}, orgUnitDatasets = {}) {
+function transformToDhis2(practitionerRoles, practitioners, orgUnitMap, period, categoryOptionCombos = {}, orgUnitNames = {}, orgUnitDatasets = {}, locationDhis2Map = null) {
   const { start: periodStart, end: periodEnd } = parsePeriod(period);
   logger.info(`Ethiopian period ${period} → Gregorian ${periodStart.toISOString().slice(0,10)} to ${periodEnd.toISOString().slice(0,10)}`);
 
@@ -393,7 +406,7 @@ function transformToDhis2(practitionerRoles, practitioners, orgUnitMap, period, 
   const noDatasetUids = new Set();
 
   for (const role of practitionerRoles) {
-    const orgUid = resolveOrgUnit(role, orgUnitMap);
+    const orgUid = resolveOrgUnit(role, orgUnitMap, locationDhis2Map);
     if (!orgUid) { skippedOrgUnit++; continue; }
 
     // Only process org units that belong to a known facility HR dataset
