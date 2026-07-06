@@ -102,12 +102,13 @@ async function runSync(period, dryRun = false, lastUpdated = null) {
     logger.info("Step 3/5 — Pass 1: streaming roles to collect practitioner IDs...");
     await ihrisService.warmSession();
 
-    // Write the iHRIS facilities log in the background (doesn't block the sync)
-    ihrisService.fetchLocations().catch(err =>
-      logger.warn(`Could not write iHRIS locations log: ${err.message}`)
-    );
+    // Kick off the authoritative Location→DHIS2 UID map fetch concurrently with
+    // Pass 1 — it's an independent paginated read of every iHRIS Location and
+    // doesn't depend on role data. Awaited just before Pass 2 needs it.
+    const locationDhis2MapPromise = ihrisService.fetchLocationDhis2Map();
 
     const practitionerIdSet = new Set();
+    const locationIdSet = new Set();
     let totalRoles = 0;
 
     await ihrisService.streamPractitionerRoles(lastUpdated, async (page) => {
@@ -115,10 +116,19 @@ async function runSync(period, dryRun = false, lastUpdated = null) {
       for (const r of page) {
         const id = r.practitioner?.reference?.split("/").pop();
         if (id) practitionerIdSet.add(id);
+        const locId = r.location?.[0]?.reference?.split("/").pop();
+        if (locId) locationIdSet.add(locId);
       }
     });
 
-    logger.info(`Pass 1 complete: ${totalRoles} roles, ${practitionerIdSet.size} unique practitioners`);
+    logger.info(`Pass 1 complete: ${totalRoles} roles, ${practitionerIdSet.size} unique practitioners, ${locationIdSet.size} unique locations`);
+
+    // Write the iHRIS facilities log in the background (doesn't block the sync).
+    // Pass the role-referenced location IDs so IN_USE reflects which facilities
+    // actually have staff assigned — needed for the reconcile-locations.js workflow.
+    ihrisService.fetchLocations(locationIdSet).catch(err =>
+      logger.warn(`Could not write iHRIS locations log: ${err.message}`)
+    );
 
     // ── Step 4: Targeted concurrent gender fetch ──────────────────────────────
     logger.info("Step 4/5 — Fetching genders for role practitioners (targeted)...");
@@ -130,9 +140,12 @@ async function runSync(period, dryRun = false, lastUpdated = null) {
       practitionerRoles: totalRoles,
     };
 
+    const locationDhis2Map = await locationDhis2MapPromise;
+    result.steps.locationDhis2Map = locationDhis2Map.size;
+
     // Pass 2: re-stream roles and transform with the complete gender map
     logger.info("Step 4/5 — Pass 2: re-streaming roles and transforming...");
-    const session = new TransformSession(orgUnitMap, syncPeriod, categoryOptionCombos, orgUnitDatasets);
+    const session = new TransformSession(orgUnitMap, syncPeriod, categoryOptionCombos, orgUnitDatasets, locationDhis2Map);
 
     await ihrisService.streamPractitionerRoles(lastUpdated, async (page) => {
       session.processPage(page, genderMap);

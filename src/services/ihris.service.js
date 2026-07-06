@@ -469,6 +469,67 @@ async function fetchPractitionerGenders() {
 }
 
 /**
+ * Extract the DHIS2 org unit UID from a Location resource's `identifier` array.
+ * iHRIS records this explicitly as identifier[].type.coding[].code === "dhis2Id" —
+ * this is the authoritative link, present on every ihris-facility-profile Location
+ * regardless of region, and doesn't depend on the resource's own `id` happening to
+ * be prefixed "DHIS2-{uid}" (which is common but not guaranteed, e.g. RHB/federal
+ * entries use human-readable ids like "federal-ministry-of-health").
+ */
+function extractDhis2IdFromIdentifier(location) {
+  for (const ident of location.identifier || []) {
+    const code = ident.type?.coding?.[0]?.code;
+    if (code && code.toLowerCase() === "dhis2id" && ident.value) return ident.value;
+  }
+  return null;
+}
+
+/**
+ * Fetch a Map of every iHRIS Location ID → DHIS2 org unit UID, read from the
+ * `dhis2Id` identifier on each Location resource (falls back to the "DHIS2-{uid}"
+ * id-prefix convention if the identifier is absent).
+ *
+ * This is the primary org-unit resolution source used by resolveOrgUnit() in
+ * hrh.transform.js — more reliable than name/code matching against DHIS2's
+ * dataset-assigned org units, since it's a direct, authoritative link recorded
+ * on the iHRIS side rather than an inferred match.
+ *
+ * Only requests id + identifier (_elements) to keep the payload small — this
+ * needs to page through every Location in iHRIS (15k+), not just role-referenced ones.
+ */
+async function fetchLocationDhis2Map() {
+  const client = await getClient();
+  const PAGE = parseInt(process.env.IHRIS_LOCATION_PAGE_SIZE || "500", 10);
+  const map = new Map();
+  let offset = 0;
+  let scanned = 0;
+
+  logger.info(`Fetching iHRIS Location → DHIS2 UID map (offset pagination, page size ${PAGE})...`);
+
+  while (true) {
+    const res = await withRetry(
+      () => client.get("/Location", { params: { _count: PAGE, _offset: offset, _elements: "id,identifier" } }),
+      { label: `Location dhis2Id map offset=${offset}` }
+    );
+    const entries = (res.data.entry || []).map(e => e.resource).filter(Boolean);
+    if (entries.length === 0) break;
+
+    for (const loc of entries) {
+      if (!loc.id) continue;
+      scanned++;
+      const dhis2Id = extractDhis2IdFromIdentifier(loc) || (loc.id.startsWith("DHIS2-") ? loc.id.replace("DHIS2-", "") : null);
+      if (dhis2Id) map.set(loc.id, dhis2Id);
+    }
+
+    if (entries.length < PAGE) break;
+    offset += PAGE;
+  }
+
+  logger.info(`Location → DHIS2 UID map: ${map.size}/${scanned} locations have a DHIS2 link`);
+  return map;
+}
+
+/**
  * Return raw pagination info from /Location for diagnostics.
  */
 async function fetchLocationsRaw() {
@@ -488,61 +549,59 @@ async function fetchLocationsRaw() {
  * Fetch ALL Location resources from iHRIS by paginating through /Location.
  * Writes logs/ihris-locations.log with one row per facility.
  *
- * practitionerRoles (optional): when provided, locations referenced by roles
- * are annotated as IN_USE so you can see which facilities have staff assigned.
+ * usedLocationIds (optional): a Set/array of iHRIS Location IDs referenced by
+ * PractitionerRole.location — when provided, matching rows are annotated as
+ * IN_USE so you can see which facilities have staff assigned. Callers should
+ * collect this from already-streamed roles rather than passing full role
+ * objects, since this function no longer needs to know their shape.
  */
-async function fetchLocations(practitionerRoles = null) {
+async function fetchLocations(usedLocationIds = null) {
   const client = await getClient();
+  const usedSet = usedLocationIds instanceof Set ? usedLocationIds : new Set(usedLocationIds || []);
 
-  // Build set of location IDs currently assigned to a practitioner
-  const usedLocationIds = new Set(
-    (practitionerRoles || [])
-      .map(r => r.location?.[0]?.reference?.split("/").pop())
-      .filter(Boolean)
-  );
-
-  // The iHRIS HAPI FHIR server reports 2630+ Location resources but its paging
-  // tokens return empty on page 2. Use a single large-count request instead.
-  // If the count grows beyond 3000 in future, the fallback pagination loop handles it.
-  logger.info("Fetching ALL Location resources from iHRIS...");
+  // /Location's _getpages token pagination returns empty on page 2 on this
+  // HAPI FHIR server (same issue PractitionerRole has) — use explicit _offset
+  // pagination instead, which hits the DB directly each time.
+  const PAGE = parseInt(process.env.IHRIS_LOCATION_PAGE_SIZE || "500", 10);
+  logger.info(`Fetching ALL Location resources from iHRIS (offset pagination, page size ${PAGE})...`);
 
   const locations = [];
-  let nextUrl = "/Location";
-  let isFirstPage = true;
+  let offset = 0;
   let pageCount = 0;
+  let serverTotal = null;
 
-  while (nextUrl) {
-    const response = await client.get(nextUrl, {
-      params: isFirstPage ? { _count: 5000 } : undefined,
-    });
-    isFirstPage = false;
+  while (true) {
     pageCount++;
-
+    const response = await withRetry(
+      () => client.get("/Location", { params: { _count: PAGE, _offset: offset } }),
+      { label: `Location offset=${offset}` }
+    );
     const bundle = response.data;
-    const entries = (bundle.entry || []).map(e => e.resource).filter(Boolean);
-    locations.push(...entries);
-    logger.info(`  /Location page ${pageCount}: ${entries.length} entries (total so far: ${locations.length})`);
 
-    let rawNextUrl = null;
-    if (Array.isArray(bundle.link)) {
-      const nextLink = bundle.link.find(l => l.relation === "next");
-      rawNextUrl = nextLink ? nextLink.url : null;
-    } else if (bundle.link && typeof bundle.link === "object") {
-      rawNextUrl = bundle.link.next || null;
+    if (offset === 0 && bundle.total != null) {
+      serverTotal = bundle.total;
+      logger.info(`  Server reports ${serverTotal} Location resources total`);
     }
-    if (!rawNextUrl || entries.length === 0) {
-      nextUrl = null;
-    } else {
-      nextUrl = rewriteNextUrl(rawNextUrl);
-      if (nextUrl) logger.info(`  Following: ${nextUrl.slice(0, 100)}`);
-    }
+
+    const entries = (bundle.entry || []).map(e => e.resource).filter(Boolean);
+    if (entries.length === 0) break;
+
+    locations.push(...entries);
+    logger.info(`  /Location offset=${offset}: ${entries.length} entries (total so far: ${locations.length}${serverTotal != null ? ` of ${serverTotal}` : ""})`);
+
+    if (entries.length < PAGE) break;
+    offset += PAGE;
+  }
+
+  if (serverTotal !== null && locations.length < serverTotal) {
+    logger.warn(`  Location pagination may be incomplete: fetched ${locations.length} but server reported ${serverTotal} total`);
   }
 
   // Also ensure any DHIS2-linked locations from roles are included —
   // HAPI FHIR sometimes excludes these from general paginated search.
-  if (usedLocationIds.size > 0) {
+  if (usedSet.size > 0) {
     const existingIds = new Set(locations.map(l => l.id));
-    const missingIds = [...usedLocationIds].filter(id => !existingIds.has(id));
+    const missingIds = [...usedSet].filter(id => !existingIds.has(id));
     if (missingIds.length > 0) {
       logger.info(`  Fetching ${missingIds.length} role-referenced locations missing from paginated search...`);
       const BATCH = 50;
@@ -579,7 +638,7 @@ async function fetchLocations(practitionerRoles = null) {
     const locId    = loc.id || "";
     const name     = loc.name || "(no name)";
     const physType = loc.physicalType?.coding?.[0]?.display || loc.physicalType?.text || "";
-    const inUse    = usedLocationIds.has(locId) ? "YES" : "NO ";
+    const inUse    = usedSet.has(locId) ? "YES" : "NO ";
 
     let dhis2Uid = "";
     if (locId.startsWith("DHIS2-")) {
@@ -603,8 +662,8 @@ async function fetchLocations(practitionerRoles = null) {
 
   lines.push("");
   lines.push(`# Summary: ${withDhis2} DHIS2-linked, ${withoutDhis2} LOCAL-only`);
-  if (usedLocationIds.size > 0) {
-    lines.push(`# In-use: ${usedLocationIds.size} unique locations referenced by PractitionerRoles`);
+  if (usedSet.size > 0) {
+    lines.push(`# In-use: ${usedSet.size} unique locations referenced by PractitionerRoles`);
   }
 
   fs.mkdirSync(path.dirname(LOCATIONS_LOG), { recursive: true });
@@ -637,6 +696,7 @@ module.exports = {
   fetchGendersForIds,
   fetchLocations,
   fetchLocationsRaw,
+  fetchLocationDhis2Map,
   warmSession,
   invalidateSession,
 };
