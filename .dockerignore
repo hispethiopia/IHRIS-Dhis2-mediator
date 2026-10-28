@@ -1,0 +1,8 @@
+node_modules
+logs
+.env
+.git
+.claude
+.Rhistory
+*.pptx
+*.docx

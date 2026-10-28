@@ -1,5 +1,3 @@
-// src/scripts/apply-mapping.js
-//
 // Reads logs/reconciliation.csv (filled-in "approved_dhis2_uid" column)
 // and updates each iHRIS Location resource to store the DHIS2 org unit UID
 // in its identifier list, so the mediator sync can match it going forward.
@@ -18,7 +16,7 @@ const REPORT_LOG = path.join(__dirname, "../../logs/apply-mapping-report.log");
 
 const DRY_RUN = process.argv.includes("--dry-run");
 
-// ─── iHRIS client ─────────────────────────────────────────────────────────────
+// iHRIS client
 let sessionCookie = null;
 
 async function getIhrisClient() {
@@ -40,7 +38,7 @@ async function getIhrisClient() {
   });
 }
 
-// ─── Parse CSV ────────────────────────────────────────────────────────────────
+// Parse CSV
 function parseCsv(content) {
   const lines = content.split("\n").filter(l => l.trim());
   const header = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g, ""));
@@ -73,10 +71,10 @@ function splitCsvLine(line) {
   return cols;
 }
 
-// ─── Fetch + patch iHRIS Location ─────────────────────────────────────────────
+// Fetch + patch iHRIS Location
 async function getLocation(client, locationId) {
   const res = await client.get(`/Location/${locationId}`, {
-    validateStatus: () => true, // never throw — inspect status ourselves
+    validateStatus: () => true, // never throw - inspect status ourselves
   });
   if (res.status === 404) return null;
   if (res.status >= 400) {
@@ -89,7 +87,7 @@ async function getLocation(client, locationId) {
 async function patchLocation(client, locationId, dhis2Uid) {
   const location = await getLocation(client, locationId);
   if (!location) {
-    console.warn(`  [WARN] Location/${locationId} not found in iHRIS — skipping`);
+    console.warn(`  [WARN] Location/${locationId} not found in iHRIS - skipping`);
     return { status: "NOT_FOUND" };
   }
 
@@ -102,21 +100,21 @@ async function patchLocation(client, locationId, dhis2Uid) {
   existing.push({ system: DHIS2_SYSTEM, value: dhis2Uid });
   location.identifier = existing;
 
-  // Strip server-managed meta fields — HAPI FHIR returns 500 if you PUT them back
+  // Strip server-managed meta fields - HAPI FHIR returns 500 if you PUT them back
   delete location.meta;
 
   if (DRY_RUN) {
-    console.log(`  [DRY RUN] Would PUT Location/${locationId} → identifier dhis2=${dhis2Uid}`);
+    console.log(`  [DRY RUN] Would PUT Location/${locationId} -> identifier dhis2=${dhis2Uid}`);
     return { status: "DRY_RUN" };
   }
 
   const res = await client.put(`/Location/${locationId}`, location, {
     headers: { "Content-Type": "application/fhir+json" },
-    validateStatus: () => true, // never throw — inspect status ourselves
+    validateStatus: () => true, // never throw - inspect status ourselves
   });
 
   if (res.status >= 200 && res.status < 300) {
-    console.log(`  OK — Location/${locationId} updated with DHIS2 UID ${dhis2Uid}`);
+    console.log(`  OK - Location/${locationId} updated with DHIS2 UID ${dhis2Uid}`);
     return { status: "UPDATED" };
   }
 
@@ -125,10 +123,10 @@ async function patchLocation(client, locationId, dhis2Uid) {
   return { status: `HTTP_${res.status}`, detail: body };
 }
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
+// Main
 async function main() {
   if (!fs.existsSync(INPUT_CSV)) {
-    console.error(`${INPUT_CSV} not found — run "npm run reconcile" first`);
+    console.error(`${INPUT_CSV} not found - run "npm run reconcile" first`);
     process.exit(1);
   }
 
@@ -136,7 +134,7 @@ async function main() {
   const approved = rows.filter(r => r.approved_dhis2_uid?.trim());
 
   console.log(`Loaded ${rows.length} rows, ${approved.length} have an approved DHIS2 UID`);
-  if (DRY_RUN) console.log("DRY RUN mode — no changes will be made to iHRIS\n");
+  if (DRY_RUN) console.log("DRY RUN mode - no changes will be made to iHRIS\n");
   if (approved.length === 0) {
     console.log("Nothing to apply. Fill the 'approved_dhis2_uid' column in the CSV first.");
     process.exit(0);
@@ -148,7 +146,7 @@ async function main() {
   const probeId = approved[0].ihris_id;
   console.log(`Probing iHRIS session with Location/${probeId}...`);
   const probe = await client.get(`/Location/${probeId}`, { validateStatus: () => true });
-  console.log(`  Probe HTTP ${probe.status} — ${probe.status < 300 ? "session OK" : "FAILED (check cookie/auth)"}`);
+  console.log(`  Probe HTTP ${probe.status} - ${probe.status < 300 ? "session OK" : "FAILED (check cookie/auth)"}`);
   if (probe.status >= 400) {
     const body = JSON.stringify(probe.data || {}).slice(0, 300);
     console.error(`  Response body: ${body}`);
@@ -161,7 +159,7 @@ async function main() {
     const row = approved[i];
     const locationId = row.ihris_id;
     const dhis2Uid   = row.approved_dhis2_uid.trim();
-    console.log(`[${i + 1}/${approved.length}] Location/${locationId} ("${row.ihris_name}") → ${dhis2Uid}`);
+    console.log(`[${i + 1}/${approved.length}] Location/${locationId} ("${row.ihris_name}") -> ${dhis2Uid}`);
 
     let result;
     try {
@@ -177,7 +175,7 @@ async function main() {
 
   // Write report
   const lines = [
-    `# apply-mapping report — ${new Date().toISOString()}`,
+    `# apply-mapping report - ${new Date().toISOString()}`,
     `# Processed: ${approved.length}, Dry Run: ${DRY_RUN}`,
     "",
     "ihris_id | ihris_name | dhis2_uid | result",
@@ -191,8 +189,8 @@ async function main() {
   const dryRun  = report.filter(r => r.result === "DRY_RUN").length;
   const failed  = report.filter(r => !["UPDATED", "DRY_RUN"].includes(r.result)).length;
 
-  console.log(`\nDone — updated: ${updated}, dry-run: ${dryRun}, skipped/failed: ${failed}`);
-  console.log(`Report: ${REPORT_LOG}`);
+  console.log(`\nDone - updated: ${updated}, dry-run: ${dryRun}, skipped/failed: ${failed}`);
+  console.log(`Report: ${path.relative(process.cwd(), REPORT_LOG)}`);
   if (!DRY_RUN && updated > 0) {
     console.log("\nRun 'npm run reconcile' again to verify the linked count increased.");
   }

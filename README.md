@@ -1,6 +1,6 @@
-# iHRIS v5 → DHIS2 HRH OpenHIM Mediator
+# iHRIS v5 to DHIS2 HRH OpenHIM Mediator
 
-Implements **Phase 2 Use Cases UC-P2-01 through UC-P2-04** from the iHRIS–DHIS2 integration specification.
+Implements **Phase 2 Use Cases UC-P2-01 through UC-P2-04** from the iHRIS-DHIS2 integration specification.
 
 ---
 
@@ -13,7 +13,7 @@ Implements **Phase 2 Use Cases UC-P2-01 through UC-P2-04** from the iHRIS–DHIS
 | UC-P2-03 | Health workers who left the institution | Part of every sync |
 | UC-P2-04 | Health workers recruited during the period | Part of every sync |
 
-Each sync produces **three separate DHIS2 dataValueSets** — one per use case — pushed to three separate DHIS2 datasets.
+Each sync produces **three separate DHIS2 dataValueSets** - one per use case - pushed to three separate DHIS2 datasets.
 
 ---
 
@@ -94,7 +94,7 @@ cp .env.example .env
 | `ATTRITION_*_FEMALE/MALE` | 42 data element UIDs for attrition |
 | `RECRUITED_*_FEMALE/MALE` | 42 data element UIDs for recruitment |
 
-Data element UIDs come from DHIS2 Maintenance → Data Elements.
+Data element UIDs come from DHIS2 Maintenance -> Data Elements.
 
 ### 3. Run
 
@@ -123,13 +123,13 @@ docker-compose up -d # Docker
 ## How the sync logic works
 
 ### UC-P2-02 Active workforce
-Counts all `PractitionerRole` resources where `active = true` and no `period.end` date — meaning the staff member is currently employed. Groups by professional category (cadre) and gender per facility.
+Counts all `PractitionerRole` resources where `active = true` and no `period.end` date - meaning the staff member is currently employed. Groups by professional category (cadre) and gender per facility.
 
 ### UC-P2-03 Left institution (attrition)
 Counts `PractitionerRole` resources where `active = false` AND `period.end` falls within the reporting period. This captures staff who quit, were transferred, or died during that quarter.
 
 ### UC-P2-04 Recruited
-Counts `PractitionerRole` resources where `period.start` (hire date) falls within the reporting period — regardless of current active status.
+Counts `PractitionerRole` resources where `period.start` (hire date) falls within the reporting period - regardless of current active status.
 
 All three run in a single pass over the same data, so one extraction from iHRIS feeds all three datasets.
 

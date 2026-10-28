@@ -1,12 +1,11 @@
-// src/routes/sync.routes.js
-// HTTP endpoints — supports on-demand trigger (UC-P2-01) and dry run for approval gate
+// HTTP endpoints: on-demand sync (UC-P2-01), dry run + approval, status and logs
 
 "use strict";
 const fs = require("fs");
 const path = require("path");
 const express = require("express");
 const router = express.Router();
-const { runSync } = require("../services/sync.service");
+const { runSync, pushPendingDryRun, hasPendingDryRun } = require("../services/sync.service");
 const logger = require("../logger");
 const { requireAuth } = require("../session");
 
@@ -63,7 +62,7 @@ router.get("/sync-hrh", requireAuth, async (req, res) => {
   const dryRun = req.query.dryRun === "true";
   const lastUpdated = req.query.lastUpdated || null;
 
-  logger.info(`GET /sync-hrh — period=${period || "auto"} dryRun=${dryRun}`);
+  logger.info(`GET /sync-hrh - period=${period || "auto"} dryRun=${dryRun}`);
 
   syncInProgress = true;
   try {
@@ -92,7 +91,7 @@ router.post("/sync-hrh", requireAuth, async (req, res) => {
   }
 
   const { period, dryRun, lastUpdated } = req.body || {};
-  logger.info(`POST /sync-hrh — period=${period || "auto"} dryRun=${dryRun || false}`);
+  logger.info(`POST /sync-hrh - period=${period || "auto"} dryRun=${dryRun || false}`);
 
   res.status(202).json({
     message: "Sync accepted and started",
@@ -104,6 +103,33 @@ router.post("/sync-hrh", requireAuth, async (req, res) => {
   runSync(period || null, !!dryRun, lastUpdated || null)
     .then((r) => { lastSyncResult = r; recordHistory(r); })
     .catch((err) => logger.error("Background sync error", { error: err.message }))
+    .finally(() => { syncInProgress = false; });
+});
+
+/**
+ * POST /sync-hrh/approve
+ * Pushes the payload built by the last dry run for the given period, without
+ * re-extracting from iHRIS. Returns 404 if no matching dry run is pending.
+ *
+ * Body: { "period": "2018" }
+ */
+router.post("/sync-hrh/approve", requireAuth, (req, res) => {
+  if (syncInProgress) {
+    return res.status(409).json({ error: "Sync already in progress" });
+  }
+
+  const { period } = req.body || {};
+  if (!period || !hasPendingDryRun(period)) {
+    return res.status(404).json({ error: `No pending dry run for period ${period || "(none)"}` });
+  }
+
+  logger.info(`POST /sync-hrh/approve - period=${period}`);
+  res.status(202).json({ message: "Push of approved dry run started", period });
+
+  syncInProgress = true;
+  pushPendingDryRun(period)
+    .then((r) => { lastSyncResult = r; recordHistory(r); })
+    .catch((err) => logger.error("Approved push error", { error: err.message }))
     .finally(() => { syncInProgress = false; });
 });
 
@@ -137,7 +163,7 @@ router.get("/sync-hrh/history", requireAuth, (_req, res) => {
 router.post("/sync-hrh/refresh-cache", requireAuth, (_req, res) => {
   const dhis2Service = require("../services/dhis2.service");
   dhis2Service.clearOrgUnitCache();
-  res.json({ ok: true, message: "Org unit cache cleared — next sync will re-fetch from DHIS2" });
+  res.json({ ok: true, message: "Org unit cache cleared - next sync will re-fetch from DHIS2" });
 });
 
 /**
@@ -199,94 +225,6 @@ router.get("/logs/stream", requireAuth, (req, res) => {
  */
 router.get("/logs/sync-status", requireAuth, (_req, res) => {
   res.json({ syncInProgress });
-});
-
-module.exports = router;
-module.exports.setLastSyncResult = (r) => { lastSyncResult = r; };
-
-/**
- * GET /verify?period=2026Q2
- * Queries DHIS2 directly for stored data values for the given period.
- * Used to confirm that a push actually landed in DHIS2.
- */
-router.get("/verify", requireAuth, async (req, res) => {
-  try {
-  const dhis2Service = require("../services/dhis2.service");
-  const { toDhis2Period } = require("../utils/ethiopian-calendar");
-  const requestedPeriod = req.query.period;
-  if (!requestedPeriod) return res.status(400).json({ error: "period query param is required (e.g. ?period=2026Q2)" });
-  // Annual periods (e.g. "2018") are stored in DHIS2 as Financial-November
-  // periods ("2018Nov") — convert so verify queries what was actually pushed.
-  const period = toDhis2Period(requestedPeriod);
-
-  // Build DE UID → env key name map
-  const deUidToName = {};
-  for (const [key, val] of Object.entries(process.env)) {
-    if (key.startsWith("DE_") && val && val.length > 5 && !val.includes("uid_here") && !val.includes("NOT_FOUND")) {
-      deUidToName[val] = key;
-    }
-  }
-
-  const datasets = [
-    { label: "Basic Health Post",         uid: process.env.DHIS2_DATASET_BASIC_HP },
-    { label: "Comprehensive Health Post", uid: process.env.DHIS2_DATASET_COMP_HP },
-    { label: "Health Center",             uid: process.env.DHIS2_DATASET_HEALTH_CENTER },
-    { label: "Hospital",                  uid: process.env.DHIS2_DATASET_HOSPITAL },
-    { label: "Clinic",                    uid: process.env.DHIS2_DATASET_CLINIC },
-    { label: "Woreda",                    uid: process.env.DHIS2_DATASET_WOREDA },
-    { label: "Zone",                      uid: process.env.DHIS2_DATASET_ZONE },
-    { label: "Region",                    uid: process.env.DHIS2_DATASET_REGION },
-  ].filter(d => d.uid);
-
-  // Warm the org unit name cache for enriching verify results.
-  let ouNames = {};
-  try {
-    await dhis2Service.fetchOrgUnitMap();
-    ouNames = dhis2Service.getOrgUnitNames();
-  } catch (err) {
-    logger.warn("Could not fetch org units for verify — some names will show as UIDs", { error: err.message });
-    ouNames = dhis2Service.getOrgUnitNames();
-  }
-
-  // Deduplicate dataset UIDs to avoid fetching the same one multiple times
-  const seen = new Set();
-  const results = [];
-  for (const ds of datasets) {
-    if (!ds.uid) { results.push({ ...ds, error: "Dataset UID not configured", dataValues: [] }); continue; }
-
-    let rawValues = [];
-    if (!seen.has(ds.uid)) {
-      seen.add(ds.uid);
-      try { rawValues = await dhis2Service.fetchStoredDataValues(ds.uid, period); }
-      catch (err) { results.push({ ...ds, error: err.message, dataValues: [] }); continue; }
-    }
-
-    // Enrich: resolve org unit and data element names
-    const MAX_VALUES = 5000;
-    const enriched = rawValues.slice(0, MAX_VALUES).map(dv => ({
-      dataElement:     dv.dataElement,
-      dataElementName: deUidToName[dv.dataElement] || dv.dataElement,
-      orgUnit:         dv.orgUnit,
-      orgUnitName:     ouNames[dv.orgUnit] || dv.orgUnit,
-      period:          dv.period,
-      value:           dv.value,
-      storedBy:        dv.storedBy,
-      lastUpdated:     dv.lastUpdated,
-    }));
-
-    results.push({
-      label: ds.label, uid: ds.uid, period,
-      totalValues: rawValues.length,
-      truncated: rawValues.length > MAX_VALUES,
-      dataValues: enriched,
-    });
-  }
-
-  res.json({ period, verifiedAt: new Date().toISOString(), datasets: results });
-  } catch (err) {
-    logger.error("Verify route error", { error: err.message, stack: err.stack });
-    if (!res.headersSent) res.status(500).json({ error: err.message });
-  }
 });
 
 /**
@@ -361,7 +299,7 @@ router.get("/debug", requireAuth, async (_req, res) => {
         locationRef,
         locationId,
         locationDisplay,
-  orgUnitMatch: locationId.startsWith("DHIS2-")
+        orgUnitMatch: locationId.startsWith("DHIS2-")
             ? locationId.replace("DHIS2-", "") + " (direct)"
             : orgUnitMap[locationId] || orgUnitMap[locationDisplay] || "NO MATCH",
         // Practitioner gender
@@ -389,3 +327,6 @@ router.get("/debug", requireAuth, async (_req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+module.exports = router;
+module.exports.setLastSyncResult = (r) => { lastSyncResult = r; };

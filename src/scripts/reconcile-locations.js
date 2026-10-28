@@ -1,5 +1,3 @@
-// src/scripts/reconcile-locations.js
-//
 // For each LOCAL+IN_USE iHRIS location (staff assigned but no DHIS2 UID),
 // searches DHIS2 by name (ilike) and outputs a CSV with up to 3 match candidates.
 //
@@ -22,7 +20,7 @@ const axios = require("axios");
 const LOCATIONS_LOG = path.join(__dirname, "../../logs/ihris-locations.log");
 const OUTPUT_CSV    = path.join(__dirname, "../../logs/reconciliation.csv");
 
-// ─── DHIS2 client ────────────────────────────────────────────────────────────
+// DHIS2 client
 const dhis2 = axios.create({
   baseURL: process.env.DHIS2_BASE_URL,
   auth: {
@@ -33,7 +31,7 @@ const dhis2 = axios.create({
   timeout: 30000,
 });
 
-// ─── Parse log ───────────────────────────────────────────────────────────────
+// Parse log
 // Log format: STATUS | IN_USE | DHIS2_UID | iHRIS_ID | Name | Physical Type
 function parseLocationsLog() {
   const content = fs.readFileSync(LOCATIONS_LOG, "utf8");
@@ -52,7 +50,7 @@ function parseLocationsLog() {
   return rows;
 }
 
-// ─── Name normalisation ───────────────────────────────────────────────────────
+// Name normalisation
 // Expand Ethiopian health-system abbreviations before searching
 const ABBREV = [
   [/\bHC\b/gi,    "Health Center"],
@@ -71,7 +69,7 @@ function expand(name) {
   return s;
 }
 
-// ─── String similarity (Dice coefficient on bigrams) ─────────────────────────
+// String similarity (Dice coefficient on bigrams)
 function dice(a, b) {
   a = a.toLowerCase();
   b = b.toLowerCase();
@@ -86,7 +84,7 @@ function dice(a, b) {
   return (2 * hits) / (a.length - 1 + b.length - 1);
 }
 
-// ─── DHIS2 search ────────────────────────────────────────────────────────────
+// DHIS2 search
 async function searchDhis2(rawName, expandedName) {
   // Build a set of search terms: full raw, full expanded, first-N-words variants
   const terms = new Set([rawName, expandedName]);
@@ -94,7 +92,7 @@ async function searchDhis2(rawName, expandedName) {
   if (words.length > 2) terms.add(words.slice(0, 3).join(" "));
   if (words.length > 1) terms.add(words.slice(0, 2).join(" "));
 
-  const seen = new Map(); // uid → org unit
+  const seen = new Map(); // uid -> org unit
 
   for (const term of terms) {
     if (!term || term.length < 3) continue;
@@ -121,7 +119,7 @@ async function searchDhis2(rawName, expandedName) {
     .slice(0, 3);
 }
 
-// ─── CSV helpers ─────────────────────────────────────────────────────────────
+// CSV helpers
 function esc(val) {
   if (val == null || val === "") return "";
   const s = String(val);
@@ -131,10 +129,10 @@ function esc(val) {
   return s;
 }
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
+// Main
 async function main() {
   if (!process.env.DHIS2_BASE_URL) {
-    console.error("DHIS2_BASE_URL not set — check .env");
+    console.error("DHIS2_BASE_URL not set - check .env");
     process.exit(1);
   }
 
@@ -154,7 +152,7 @@ async function main() {
   for (let i = 0; i < locations.length; i++) {
     const loc      = locations[i];
     const expanded = expand(loc.name);
-    console.log(`[${i + 1}/${locations.length}] "${loc.name}"${expanded !== loc.name ? ` → "${expanded}"` : ""}`);
+    console.log(`[${i + 1}/${locations.length}] "${loc.name}"${expanded !== loc.name ? ` -> "${expanded}"` : ""}`);
 
     const matches = await searchDhis2(loc.name, expanded);
 
@@ -175,7 +173,7 @@ async function main() {
         row.push("", "", "", "");
       }
     }
-    row.push(""); // approved_dhis2_uid — filled in by human
+    row.push(""); // approved_dhis2_uid - filled in by human
     csvRows.push(row.join(","));
 
     // 200 ms gap so we don't hammer DHIS2
@@ -185,7 +183,7 @@ async function main() {
   fs.mkdirSync(path.dirname(OUTPUT_CSV), { recursive: true });
   fs.writeFileSync(OUTPUT_CSV, csvRows.join("\n"), "utf8");
 
-  console.log(`\nOutput: ${OUTPUT_CSV}`);
+  console.log(`\nOutput: ${path.relative(process.cwd(), OUTPUT_CSV)}`);
   console.log("Next steps:");
   console.log("  1. Open logs/reconciliation.csv");
   console.log("  2. For each row, copy the correct UID into the 'approved_dhis2_uid' column");

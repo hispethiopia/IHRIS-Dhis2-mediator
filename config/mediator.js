@@ -1,12 +1,12 @@
-// config/mediator.js — OpenHIM mediator registration descriptor
-// MEDIATOR_HOST allows overriding "localhost" when OpenHIM runs in Docker
-// and can't reach the host via localhost. Set to the host's IP, e.g. 172.17.0.1
+// OpenHIM mediator registration descriptor
+// MEDIATOR_HOST is the hostname OpenHIM uses to reach this mediator
+// (e.g. the container name when both run on the same Docker network).
 const MEDIATOR_HOST = process.env.MEDIATOR_HOST || "localhost";
 
 module.exports = {
   urn: "urn:mediator:ihris-dhis2-hrh",
   version: "1.0.0",
-  name: "iHRIS → DHIS2 HRH Mediator",
+  name: "iHRIS-DHIS2 HRH Mediator",
   description: "Pulls HRH data from iHRIS v5 FHIR API and pushes aggregate data to DHIS2",
   defaultChannelConfig: [
     {

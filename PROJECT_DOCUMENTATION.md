@@ -1,4 +1,4 @@
-# iHRIS → DHIS2 HRH Mediator — Project Documentation
+# iHRIS to DHIS2 HRH Mediator - Project Documentation
 
 **Project:** iHRIS to DHIS2 Human Resources for Health (HRH) Data Sync Mediator
 **Version:** 1.0.0
@@ -23,7 +23,7 @@
    - 5.7 [Ethiopian Calendar Utility](#57-ethiopian-calendar-utility)
    - 5.8 [Sync Routes (API)](#58-sync-routes-api)
    - 5.9 [Web UI](#59-web-ui)
-6. [Data Flow — Full Sync Pipeline](#6-data-flow--full-sync-pipeline)
+6. [Data Flow - Full Sync Pipeline](#6-data-flow--full-sync-pipeline)
 7. [API Endpoints Reference](#7-api-endpoints-reference)
 8. [Cadre Mapping](#8-cadre-mapping)
 9. [Dataset Configuration](#9-dataset-configuration)
@@ -42,12 +42,12 @@
 
 This mediator is a Node.js application that bridges two national health information systems in Ethiopia:
 
-- **iHRIS v5** — the Human Resources Information System, which stores staff records (Practitioners and PractitionerRoles) in a FHIR R4 API.
-- **DHIS2** — the national health data warehouse, which stores aggregate HR statistics by facility, cadre, and gender across reporting periods.
+- **iHRIS v5** - the Human Resources Information System, which stores staff records (Practitioners and PractitionerRoles) in a FHIR R4 API.
+- **DHIS2** - the national health data warehouse, which stores aggregate HR statistics by facility, cadre, and gender across reporting periods.
 
 The mediator extracts individual-level HR records from iHRIS, aggregates them by health cadre and gender for each facility, and pushes the resulting aggregate counts to DHIS2 datasets. This automates what was previously a manual data entry process and ensures that DHIS2 HR dashboards reflect the actual workforce state from iHRIS.
 
-The system operates on the **Ethiopian calendar** (EFY — Ethiopian Fiscal Year), not the Gregorian calendar, which is the standard reporting basis used by the Ministry of Health.
+The system operates on the **Ethiopian calendar** (EFY - Ethiopian Fiscal Year), not the Gregorian calendar, which is the standard reporting basis used by the Ministry of Health.
 
 ---
 
@@ -169,12 +169,12 @@ ihris-dhis2-mediator/
 
 The Express server initializes all middleware and routes:
 
-- **Security headers** — sets `X-Content-Type-Options`, `X-Frame-Options`, `X-XSS-Protection`, and `Referrer-Policy` on every response.
-- **Static file serving** — serves the web UI from `public/`.
-- **Auth endpoints** — `POST /auth/login` proxies login to iHRIS, issues an HttpOnly `sid` session cookie. `POST /auth/logout` invalidates the session.
-- **Sync routes** — all `/sync-hrh` and related API routes are mounted here.
-- **OpenHIM registration** — if `REGISTER_MEDIATOR=true`, registers with OpenHIM on startup and activates a heartbeat.
-- **Cron scheduler** — if `CRON_ENABLED=true`, schedules automatic syncs on a configurable cron expression (default: first day of each quarter at 02:00).
+- **Security headers** - sets `X-Content-Type-Options`, `X-Frame-Options`, `X-XSS-Protection`, and `Referrer-Policy` on every response.
+- **Static file serving** - serves the web UI from `public/`.
+- **Auth endpoints** - `POST /auth/login` proxies login to iHRIS, issues an HttpOnly `sid` session cookie. `POST /auth/logout` invalidates the session.
+- **Sync routes** - all `/sync-hrh` and related API routes are mounted here.
+- **OpenHIM registration** - if `REGISTER_MEDIATOR=true`, registers with OpenHIM on startup and activates a heartbeat.
+- **Cron scheduler** - if `CRON_ENABLED=true`, schedules automatic syncs on a configurable cron expression (default: first day of each quarter at 02:00).
 
 ---
 
@@ -238,13 +238,12 @@ Handles all communication with the DHIS2 API using Basic Auth.
 | Function | Purpose |
 |---|---|
 | `pushDataValueSet(payload)` | Submits a `dataValueSet` to DHIS2 using `async=true` to avoid connection timeouts on large imports. Polls `/system/tasks/DATAVALUE_IMPORT/{taskId}` every 5 seconds until the import completes (timeout configurable via `DHIS2_TASK_TIMEOUT_MS`, default 60 minutes). |
-| `fetchOrgUnitMap()` | Reads org units from all configured HR datasets in DHIS2. Returns a map of `{code|name → uid}`. Cached for 30 minutes. |
+| `fetchOrgUnitMap()` | Reads org units from all configured HR datasets in DHIS2. Returns a map of `{code|name -> uid}`. Cached for 30 minutes. |
 | `fetchGenderCategoryOptionCombos()` | Discovers Male/Female category option combo UIDs from a data element's category combo. Can be overridden with `DHIS2_COC_MALE` / `DHIS2_COC_FEMALE` env vars. Cached for the process lifetime. |
-| `fetchStoredDataValues(dataSetId, period)` | Queries stored data values from DHIS2 for the verify endpoint. Uses root org unit + `children=true` to fetch all values in a single request. |
 | `validateDataset(id)` | Checks that a DHIS2 dataset UID exists and is accessible before starting a sync. |
 | `clearOrgUnitCache()` | Invalidates the org unit cache so the next sync re-fetches from DHIS2. |
-| `getOrgUnitNames()` | Returns `{uid → displayName}` map populated by the last `fetchOrgUnitMap()` call. |
-| `getOrgUnitDatasets()` | Returns `{uid → datasetId}` map — used to route each org unit's data values to the correct DHIS2 dataset. |
+| `getOrgUnitNames()` | Returns `{uid -> displayName}` map populated by the last `fetchOrgUnitMap()` call. |
+| `getOrgUnitDatasets()` | Returns `{uid -> datasetId}` map - used to route each org unit's data values to the correct DHIS2 dataset. |
 
 **Async Import Design:**
 DHIS2's synchronous `POST /dataValueSets` times out on large datasets. The service submits with `async=true`, which causes DHIS2 to queue the import and return a task ID immediately. The service then polls the task status endpoint and waits for `completed: true` before fetching the import summary (imported/updated/ignored counts and any conflicts).
@@ -255,25 +254,25 @@ DHIS2's synchronous `POST /dataValueSets` times out on large datasets. The servi
 
 **File:** `src/services/sync.service.js`
 
-Orchestrates the full iHRIS → DHIS2 pipeline. The `runSync(period, dryRun, lastUpdated)` function executes these steps:
+Orchestrates the full iHRIS to DHIS2 pipeline. The `runSync(period, dryRun, lastUpdated)` function executes these steps:
 
-**Step 1 — Validate DHIS2 Datasets**
+**Step 1 - Validate DHIS2 Datasets**
 Verifies all configured dataset UIDs are accessible in DHIS2 before spending time fetching iHRIS data.
 
-**Step 2 — Load DHIS2 Org Units and Gender COCs**
+**Step 2 - Load DHIS2 Org Units and Gender COCs**
 Fetches the org unit map and gender category option combo UIDs from DHIS2. These are used during transform to route values to the correct org unit and gender bucket.
 
-**Step 3 — Pass 1: Stream Roles to Collect Practitioner IDs**
-Streams all PractitionerRole resources from iHRIS and collects the set of unique practitioner IDs referenced in those roles. This pass does not process data — it only gathers IDs.
+**Step 3 - Pass 1: Stream Roles to Collect Practitioner IDs**
+Streams all PractitionerRole resources from iHRIS and collects the set of unique practitioner IDs referenced in those roles. This pass does not process data - it only gathers IDs.
 
-**Step 4 — Targeted Gender Fetch**
+**Step 4 - Targeted Gender Fetch**
 Fetches gender for only the practitioners referenced in roles (not all ~400K+ practitioners). This is much faster: targeted concurrent batch fetch (~50-70 min total) vs. scanning all practitioners (~7 hours).
 
-**Step 4 (Pass 2) — Re-stream Roles and Transform**
+**Step 4 (Pass 2) - Re-stream Roles and Transform**
 Streams all roles again, this time running the transform against the complete gender map. The `TransformSession` accumulates counts per org unit, cadre, and gender without holding all roles in memory simultaneously.
 
-**Step 5 — Push to DHIS2 (or Dry Run)**
-All dataset payloads are pushed to DHIS2 concurrently with `Promise.allSettled`. Total push time equals the slowest single dataset, not the sum of all. In dry-run mode, the payload is built but not pushed — the result is returned for review.
+**Step 5 - Push to DHIS2 (or Dry Run)**
+All dataset payloads are pushed to DHIS2 concurrently with `Promise.allSettled`. Total push time equals the slowest single dataset, not the sum of all. In dry-run mode, the payload is built but not pushed - the result is returned for review.
 
 A cadre summary table and per-org-unit breakdown are logged and included in the sync result for reporting purposes.
 
@@ -285,9 +284,9 @@ A cadre summary table and per-org-unit breakdown are logged and included in the 
 
 Maps iHRIS FHIR resources to DHIS2 aggregate data values. Implements three use case scenarios tracked by the Ministry:
 
-- **UC-P2-02 — Active Workforce** (`DE_*_END_OF_YEAR`): Staff currently active (no end date on their role) at the end of the reporting year.
-- **UC-P2-03 — Left Institution** (`DE_*_LEAVING`): Staff who left during the reporting period (role ended within the period date range).
-- **UC-P2-04 — Recruited** (`DE_*_RECRUITED`): Staff who joined during the reporting period (role started within the period date range).
+- **UC-P2-02 - Active Workforce** (`DE_*_END_OF_YEAR`): Staff currently active (no end date on their role) at the end of the reporting year.
+- **UC-P2-03 - Left Institution** (`DE_*_LEAVING`): Staff who left during the reporting period (role ended within the period date range).
+- **UC-P2-04 - Recruited** (`DE_*_RECRUITED`): Staff who joined during the reporting period (role started within the period date range).
 
 Additionally, a **Beginning of Year** count (`DE_*_BEGINNING`) is computed: staff who were present at the start of the period (hired before period start and not yet departed).
 
@@ -302,7 +301,7 @@ Each `PractitionerRole` has a `code` field containing the job title. The transfo
 | `HEALTH_OFFICERS` | "health officer" |
 | `HEALTH_EXTENSION` | "health extension", "family health", "level iv hew", "hew " |
 | `ESOS` | "emergency surgical", "eso " |
-| `OTHER_HEALTH` | (catch-all — everything else) |
+| `OTHER_HEALTH` | (catch-all - everything else) |
 
 **Org Unit Resolution:**
 iHRIS stores location as `Location/DHIS2-{orgUnitUID}` or as a local iHRIS location ID. The transform resolves UIDs in this priority order:
@@ -314,10 +313,10 @@ iHRIS stores location as `Location/DHIS2-{orgUnitUID}` or as a local iHRIS locat
 Each count is split by gender using DHIS2 Category Option Combos (COCs). The transform uses the gender stored in the standard FHIR `Practitioner.gender` field. Roles with no resolvable gender are skipped and counted in the diagnostic summary.
 
 **Streaming Mode (`TransformSession`):**
-The main sync uses `TransformSession` instead of the batch `transformToDhis2` function. It maintains four accumulator maps (`_beginning`, `_active`, `_attrition`, `_recruited`) in memory and processes roles one page at a time. Pages are garbage-collected as soon as `processPage()` returns, so the process never holds all roles in memory simultaneously.
+The main sync uses `TransformSession`, which maintains four accumulator maps (`_beginning`, `_active`, `_attrition`, `_recruited`) in memory and processes roles one page at a time. Pages are garbage-collected as soon as `processPage()` returns, so the process never holds all roles in memory simultaneously.
 
 **Multi-Dataset Routing:**
-Each DHIS2 org unit belongs to exactly one HR dataset (e.g. Hospital, Health Center, Woreda). The transform uses the `orgUnitDatasets` map (`{uid → datasetId}`) to route each org unit's data values to the correct dataset payload. Admin-level datasets (Woreda, Zone, Region) use separate data element env var prefixes (`DE_WOREDA_*`, `DE_ZONE_*`, `DE_REGION_*`).
+Each DHIS2 org unit belongs to exactly one HR dataset (e.g. Hospital, Health Center, Woreda). The transform uses the `orgUnitDatasets` map (`{uid -> datasetId}`) to route each org unit's data values to the correct dataset payload. Admin-level datasets (Woreda, Zone, Region) use separate data element env var prefixes (`DE_WOREDA_*`, `DE_ZONE_*`, `DE_REGION_*`).
 
 ---
 
@@ -325,7 +324,7 @@ Each DHIS2 org unit belongs to exactly one HR dataset (e.g. Hospital, Health Cen
 
 **File:** `src/utils/ethiopian-calendar.js`
 
-Converts Ethiopian calendar periods (EFY — Ethiopian Fiscal Year) to Gregorian date ranges, and determines the current Ethiopian year.
+Converts Ethiopian calendar periods (EFY - Ethiopian Fiscal Year) to Gregorian date ranges, and determines the current Ethiopian year.
 
 - The Ethiopian new year (Enkutatash) falls on September 11 in ordinary years or September 12 in years preceding a Gregorian leap year.
 - The EFY runs from September to August.
@@ -350,7 +349,7 @@ An in-memory `syncInProgress` flag prevents concurrent sync runs and returns HTT
 
 **File:** `public/index.html`
 
-A single-page application served by Express from the `public/` directory. No build step required — vanilla HTML, CSS, and JavaScript.
+A single-page application served by Express from the `public/` directory. No build step required - vanilla HTML, CSS, and JavaScript.
 
 **Login Screen:**
 - MoH Ethiopia logo.
@@ -360,30 +359,25 @@ A single-page application served by Express from the `public/` directory. No bui
 
 **Main Application (post-login):**
 
-The app has five tabs:
+The app has four tabs:
 
 1. **Dashboard**
    - Stats cards: Practitioners fetched, Active roles, Org units mapped (populated from sync results).
    - Sync control panel: period input (default is current Ethiopian year), dry-run toggle, "Run Sync" button.
-   - Animated pipeline progress bar (5 steps: Validate → Load org units → Extract → Transform → Push).
+   - Animated pipeline progress bar (5 steps: Validate -> Load org units -> Extract -> Transform -> Push).
    - Last sync status card.
 
 2. **Data Preview**
-   - Fetches a dry-run result for a given period.
+   - Shows the result of the last sync for a given period. Any sync started from the Dashboard (dry run or push) is reused here, so the data is fetched only once; "Re-run" forces a fresh dry run.
    - Shows dataset-by-dataset summary with data value counts and org unit counts.
    - Cadre summary table: Active / Left / Recruited per cadre.
    - Org unit breakdown table with expandable per-data-element detail rows.
-   - Sticky approval bar at the bottom: "Approve & Push" / "Reject" buttons.
+   - Sticky approval bar at the bottom: "Approve & Push" / "Reject" buttons. Approving pushes the payload the dry run already built (`POST /sync-hrh/approve`) instead of re-extracting from iHRIS; if the server no longer holds it (e.g. after a restart), a full sync runs instead.
 
-3. **Verify in DHIS2**
-   - Queries `/verify?period=...` to read stored data values directly from DHIS2.
-   - Shows each configured dataset with a data value table (data element name, org unit name, value).
-   - Used to confirm that a push actually landed correctly.
-
-4. **Sync History**
+3. **Sync History**
    - Table of the last 100 completed syncs (period, type, status, dataset counts, duration, timestamp).
 
-5. **Logs**
+4. **Logs**
    - Real-time log stream via Server-Sent Events (`/logs/stream`).
    - Shows last 300 lines on connect, then streams new lines as they arrive.
    - Live connection badge (green = connected, red = disconnected).
@@ -398,7 +392,7 @@ Light/dark mode persisted in `localStorage`. Theme preference is applied before 
 
 ---
 
-## 6. Data Flow — Full Sync Pipeline
+## 6. Data Flow - Full Sync Pipeline
 
 ```
 Browser / OpenHIM
@@ -442,12 +436,12 @@ Browser / OpenHIM
 | `POST` | `/auth/logout` | No | Destroy mediator session cookie |
 | `GET` | `/health` | No | OpenHIM heartbeat; returns mediator status and last sync summary |
 | `GET` | `/sync-hrh` | Yes | Synchronous on-demand sync. Query params: `period`, `dryRun=true`, `lastUpdated` |
-| `POST` | `/sync-hrh` | Yes | Async trigger — returns 202 immediately, runs sync in background |
+| `POST` | `/sync-hrh` | Yes | Async trigger - returns 202 immediately, runs sync in background |
+| `POST` | `/sync-hrh/approve` | Yes | Pushes the payload from the last dry run for `period` without re-extracting; 404 if none is pending |
 | `GET` | `/sync-hrh/status` | Yes | Returns `in_progress` or last completed sync result |
 | `GET` | `/sync-hrh/history` | Yes | Returns array of last 100 sync results |
 | `POST` | `/sync-hrh/refresh-cache` | Yes | Clears the 30-minute DHIS2 org unit cache |
-| `GET` | `/verify?period=` | Yes | Queries DHIS2 for stored data values and returns enriched rows |
-| `GET` | `/logs/stream` | Yes | Server-Sent Events — streams live log lines |
+| `GET` | `/logs/stream` | Yes | Server-Sent Events - streams live log lines |
 | `GET` | `/logs/sync-status` | Yes | Returns `{syncInProgress: true/false}` |
 | `GET` | `/debug` | Yes | Sample of 5 roles showing cadre/org unit/gender mapping diagnostics |
 | `GET` | `/debug/locations` | Yes | Fetches all iHRIS Location resources, writes `logs/ihris-locations.log` |
@@ -509,7 +503,7 @@ Copy `.env.example` to `.env` and fill in all values.
 | `IHRIS_PAGE_SIZE` | PractitionerRoles per page (default: 500) |
 | `IHRIS_GENDER_PAGE_SIZE` | Practitioners per page for gender fetch (default: 2000) |
 | `IHRIS_GENDER_CONCURRENCY` | Parallel gender batch requests (default: 10) |
-| `IHRIS_MAX_ROLES` | Cap on roles per stream — set to 0 for production, small number for demos |
+| `IHRIS_MAX_ROLES` | Cap on roles per stream - set to 0 for production, small number for demos |
 
 ### DHIS2 Connection
 
@@ -558,7 +552,7 @@ DE_WOREDA_MIDWIVES_END_OF_YEAR    DE_ZONE_NURSES_LEAVING    etc.
 | Variable | Description |
 |---|---|
 | `CRON_ENABLED` | `true` to enable automatic scheduled syncs |
-| `CRON_SCHEDULE` | Cron expression (default: `0 2 1 1,4,7,10 *` — quarterly) |
+| `CRON_SCHEDULE` | Cron expression (default: `0 2 1 1,4,7,10 *` - quarterly) |
 
 ---
 
@@ -572,7 +566,7 @@ The mediator is designed to run as an OpenHIM mediator. On startup (when `REGIST
 
 OpenHIM-forwarded requests bypass the `sid` session cookie check (identified by the `x-openhim-transactionid` header) so OpenHIM can trigger syncs without UI authentication.
 
-If OpenHIM is not used, the mediator works as a standalone server — simply set `REGISTER_MEDIATOR=false`.
+If OpenHIM is not used, the mediator works as a standalone server - simply set `REGISTER_MEDIATOR=false`.
 
 ---
 
@@ -580,7 +574,7 @@ If OpenHIM is not used, the mediator works as a standalone server — simply set
 
 When `CRON_ENABLED=true`, the mediator schedules an automatic sync using the `node-cron` library.
 
-The default schedule `0 2 1 1,4,7,10 *` triggers on the first day of January, April, July, and October at 02:00 — roughly aligning with Ethiopian fiscal quarters (note: the period passed to iHRIS is the current Ethiopian year, not the Gregorian quarter).
+The default schedule `0 2 1 1,4,7,10 *` triggers on the first day of January, April, July, and October at 02:00 - roughly aligning with Ethiopian fiscal quarters (note: the period passed to iHRIS is the current Ethiopian year, not the Gregorian quarter).
 
 The cron expression can be replaced with any valid 5-part cron string via the `CRON_SCHEDULE` env variable.
 
@@ -626,13 +620,13 @@ The start script sets `--max-old-space-size=4096` (4 GB heap) via `package.json`
 
 ## 14. Utility Scripts
 
-### `npm run reconcile` — `src/scripts/reconcile-locations.js`
+### `npm run reconcile` - `src/scripts/reconcile-locations.js`
 
 Compares iHRIS Location resources against DHIS2 org units and produces `logs/reconciliation.csv`. Useful for identifying facilities in iHRIS that are not yet linked to a DHIS2 org unit, which would cause those staff members to be excluded from the sync.
 
-### `npm run build-mapping` — `src/scripts/build-mapping.js`
+### `npm run build-mapping` - `src/scripts/build-mapping.js`
 
-Builds `config/location-mapping.json` from the reconciliation output. This file provides manual ID → UID overrides for facilities not yet linked in iHRIS.
+Builds `config/location-mapping.json` from the reconciliation output. This file provides manual ID -> UID overrides for facilities not yet linked in iHRIS.
 
 ### `src/scripts/apply-mapping.js`
 
@@ -648,7 +642,7 @@ Reads `config/location-mapping.json` and applies the DHIS2 UIDs back to iHRIS Lo
 
 | File | Content |
 |---|---|
-| `logs/combined.log` | All log levels — info, warn, error |
+| `logs/combined.log` | All log levels - info, warn, error |
 | `logs/error.log` | Error-level messages only |
 | `logs/ihris-locations.log` | Facility audit: DHIS2-linked vs LOCAL, IN_USE flag, sorted by name |
 | `logs/reconciliation.csv` | Output of the reconcile-locations script |
@@ -677,7 +671,7 @@ max(active_page_size × record_size, inactive_page_size × record_size) + gender
 
 ### Targeted Gender Fetch
 
-Instead of paging through all practitioners to get gender, the mediator collects the practitioner IDs from Pass 1 and fetches gender for only those IDs using `_id` batch queries with configurable concurrency. This reduces gender fetch time from ~7 hours (full scan) to ~50–70 minutes on the full Ethiopia dataset.
+Instead of paging through all practitioners to get gender, the mediator collects the practitioner IDs from Pass 1 and fetches gender for only those IDs using `_id` batch queries with configurable concurrency. This reduces gender fetch time from ~7 hours (full scan) to ~50-70 minutes on the full Ethiopia dataset.
 
 ### Concurrent Dataset Push
 
@@ -693,7 +687,7 @@ Only the fields needed by the transform are requested from iHRIS: `id,active,loc
 
 ### `_offset` Pagination
 
-HAPI FHIR's token-based pagination (`_getpages`) is unreliable on production servers — the server-side search state expires between pages, causing page 2+ to return empty. The mediator uses explicit `_offset` parameters to page directly from the database on every request, which is reliable at the cost of slightly higher database load.
+HAPI FHIR's token-based pagination (`_getpages`) is unreliable on production servers - the server-side search state expires between pages, causing page 2+ to return empty. The mediator uses explicit `_offset` parameters to page directly from the database on every request, which is reliable at the cost of slightly higher database load.
 
 ---
 
@@ -712,4 +706,4 @@ HAPI FHIR's token-based pagination (`_getpages`) is unreliable on production ser
 
 ---
 
-*This document covers the complete implementation of the iHRIS → DHIS2 HRH Mediator as of the initial release (June 2026). For questions or support, contact HISP Ethiopia.*
+*This document covers the complete implementation of the iHRIS to DHIS2 HRH Mediator as of the initial release (June 2026). For questions or support, contact HISP Ethiopia.*

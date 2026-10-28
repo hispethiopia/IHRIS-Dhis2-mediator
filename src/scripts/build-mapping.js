@@ -1,8 +1,6 @@
-// src/scripts/build-mapping.js
-//
 // Reads the approved_dhis2_uid column from logs/reconciliation.csv and
 // writes/updates config/location-mapping.json.
-// No iHRIS API calls — safe to run at any time.
+// No iHRIS API calls - safe to run at any time.
 //
 // Usage: node src/scripts/build-mapping.js
 
@@ -43,7 +41,7 @@ function parseCsv(content) {
 }
 
 if (!fs.existsSync(INPUT_CSV)) {
-  console.error(`${INPUT_CSV} not found — run "npm run reconcile" first`);
+  console.error(`${INPUT_CSV} not found - run "npm run reconcile" first`);
   process.exit(1);
 }
 
@@ -62,7 +60,7 @@ if (fs.existsSync(OUTPUT_JSON)) {
     const raw = JSON.parse(fs.readFileSync(OUTPUT_JSON, "utf8"));
     existing = Object.fromEntries(Object.entries(raw).filter(([k]) => !k.startsWith("_")));
   } catch {
-    console.warn("Could not parse existing location-mapping.json — will overwrite");
+    console.warn("Could not parse existing location-mapping.json - will overwrite");
   }
 }
 
@@ -82,4 +80,4 @@ const output = {
 };
 
 fs.writeFileSync(OUTPUT_JSON, JSON.stringify(output, null, 2), "utf8");
-console.log(`Updated config/location-mapping.json — added: ${added}, updated: ${updated}, total: ${Object.keys(existing).length}`);
+console.log(`Updated config/location-mapping.json - added: ${added}, updated: ${updated}, total: ${Object.keys(existing).length}`);

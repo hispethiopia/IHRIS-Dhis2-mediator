@@ -9,3 +9,6 @@ logs/
 
 # Claude IDE folder
 .claude/
+
+# Local editor/tool files
+.Rhistory

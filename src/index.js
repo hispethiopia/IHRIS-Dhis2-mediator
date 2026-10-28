@@ -1,4 +1,3 @@
-// src/index.js
 require("dotenv").config();
 
 const express = require("express");
@@ -13,7 +12,7 @@ const { createSession, destroySession, parseSidCookie } = require("./session");
 const app = express();
 app.use(express.json());
 
-// ── Security headers ──────────────────────────────────────────────────────────
+// Security headers
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "SAMEORIGIN");
@@ -22,10 +21,10 @@ app.use((req, res, next) => {
   next();
 });
 
-// ── Serve UI ──────────────────────────────────────────────────────────────────
+// Serve UI
 app.use(express.static(path.join(__dirname, "../public")));
 
-// ── Auth endpoints ────────────────────────────────────────────────────────────
+// Auth endpoints
 app.post("/auth/login", async (req, res) => {
   const axios = require("axios");
   const { username, password } = req.body || {};
@@ -69,19 +68,16 @@ app.post("/auth/logout", (req, res) => {
   res.json({ ok: true });
 });
 
-// ── Sync routes ───────────────────────────────────────────────────────────────
+// Sync routes
 app.use("/", syncRoutes);
 
-// ── Start server ──────────────────────────────────────────────────────────────
+// Start server
 const PORT = process.env.MEDIATOR_PORT || 3000;
 const server = app.listen(PORT, () => {
-  logger.info(`iHRIS→DHIS2 Mediator on port ${PORT}`);
-  logger.info(`  UI:      http://localhost:${PORT}`);
-  logger.info(`  Health:  http://localhost:${PORT}/health`);
-  logger.info(`  Trigger: http://localhost:${PORT}/sync-hrh`);
+  logger.info(`iHRIS-DHIS2 Mediator listening on port ${PORT}`);
 });
 
-// ── OpenHIM Registration ──────────────────────────────────────────────────────
+// OpenHIM Registration
 if (process.env.REGISTER_MEDIATOR === "true") {
   const openhimConfig = {
     apiURL: process.env.OPENHIM_URL,
@@ -95,13 +91,13 @@ if (process.env.REGISTER_MEDIATOR === "true") {
     .then(mediatorUtils => {
       mediatorUtils.registerMediator(openhimConfig, mediatorConfig, err => {
         if (err) { logger.error("OpenHIM registration failed", { error: err.message }); }
-        else { logger.info("✓ Registered with OpenHIM"); mediatorUtils.activateHeartbeat(openhimConfig); }
+        else { logger.info("Registered with OpenHIM"); mediatorUtils.activateHeartbeat(openhimConfig); }
       });
     })
     .catch(err => logger.error("Could not load openhim-mediator-utils", { error: err.message }));
 }
 
-// ── Cron ──────────────────────────────────────────────────────────────────────
+// Cron
 if (process.env.CRON_ENABLED === "true") {
   const schedule = process.env.CRON_SCHEDULE || "0 2 1 1,4,7,10 *";
   if (cron.validate(schedule)) {
@@ -110,7 +106,7 @@ if (process.env.CRON_ENABLED === "true") {
       try { const r = await runSync(); syncRoutes.setLastSyncResult(r); }
       catch (err) { logger.error("Scheduled sync error", { error: err.message }); }
     });
-    logger.info(`✓ Scheduler: "${schedule}"`);
+    logger.info(`Sync scheduled with cron "${schedule}"`);
   }
 }
 

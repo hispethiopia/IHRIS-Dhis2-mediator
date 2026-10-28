@@ -1,4 +1,3 @@
-// src/services/ihris.service.js
 // Fetches HRH data from iHRIS v5 FHIR API
 // Auth: cookie-based session (POST /auth/login, then reuse Set-Cookie header)
 
@@ -12,7 +11,7 @@ const LOCATIONS_LOG = path.join(__dirname, "../../logs/ihris-locations.log");
 
 /**
  * Retry a function up to `retries` times with exponential backoff.
- * Retries on any error — the caller is responsible for idempotency.
+ * Retries on any error - the caller is responsible for idempotency.
  */
 async function withRetry(fn, { retries = 3, baseDelayMs = 2000, label = "request" } = {}) {
   let lastErr;
@@ -23,7 +22,7 @@ async function withRetry(fn, { retries = 3, baseDelayMs = 2000, label = "request
       lastErr = err;
       if (attempt < retries) {
         const delay = baseDelayMs * Math.pow(2, attempt);
-        logger.warn(`  ${label}: attempt ${attempt + 1}/${retries} failed (${err.message}) — retrying in ${delay / 1000}s...`);
+        logger.warn(`  ${label}: attempt ${attempt + 1}/${retries} failed (${err.message}) - retrying in ${delay / 1000}s...`);
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
@@ -95,19 +94,14 @@ async function getClient() {
 }
 
 /**
- * Rewrite internal Docker/container URLs in FHIR bundle next-page links
- * to the external URL configured in IHRIS_BASE_URL.
- *
- * iHRIS running in Docker knows itself as an internal IP (e.g. 172.19.0.x)
- * and embeds that in bundle pagination links. We must rewrite them to the
- * publicly accessible host before following them.
+ * Rewrite the host in FHIR bundle next-page links to the one in IHRIS_BASE_URL.
+ * iHRIS can embed its internal container address in pagination links.
  */
 function rewriteNextUrl(url) {
   if (!url) return null;
   try {
     const internal = new URL(url);
     const external = new URL(process.env.IHRIS_BASE_URL);
-    // Replace the host:port with the configured external host:port
     internal.hostname = external.hostname;
     internal.port = external.port || (external.protocol === "https:" ? "443" : "80");
     internal.protocol = external.protocol;
@@ -118,8 +112,7 @@ function rewriteNextUrl(url) {
 }
 
 /**
- * Fetch all entries from a paginated FHIR bundle.
- * Logs bundle.total on the first page so we can verify all records are received.
+ * Fetch all entries from a paginated FHIR bundle by following next links.
  */
 async function fetchAllPages(client, resourcePath, params = {}) {
   const entries = [];
@@ -159,9 +152,9 @@ async function fetchAllPages(client, resourcePath, params = {}) {
       rawNextUrl = bundle.link.next || null;
     }
 
-    // Stop if the page was empty — avoids infinite loop on broken next links
+    // Stop if the page was empty - avoids infinite loop on broken next links
     if (pageEntries.length === 0) {
-      if (rawNextUrl) logger.warn(`  Page ${pageNum} was empty but server returned a next link — stopping pagination`);
+      if (rawNextUrl) logger.warn(`  Page ${pageNum} was empty but server returned a next link - stopping pagination`);
       break;
     }
 
@@ -176,23 +169,8 @@ async function fetchAllPages(client, resourcePath, params = {}) {
 }
 
 /**
- * Fetch all Practitioners (all pages).
- */
-async function fetchPractitioners(lastUpdatedFilter = null) {
-  const client = await getClient();
-  const params = { _count: 200 };
-  if (lastUpdatedFilter) params["_lastUpdated"] = lastUpdatedFilter;
-
-  logger.info("Fetching all Practitioners from iHRIS (all pages)...");
-  const results = await fetchAllPages(client, "/Practitioner", params);
-  logger.info(`Fetched ${results.length} practitioners total`);
-  return results;
-}
-
-/**
- * Fetch practitioners by ID directly from a list of PractitionerRoles.
- * Used when the Practitioner endpoint paginates poorly or stops early.
- * Batches requests to avoid overwhelming the server.
+ * Fetch the practitioners referenced by a list of PractitionerRoles, in _id batches.
+ * Used by the /debug endpoint.
  */
 async function fetchPractitionersByRoles(practitionerRoles) {
   const client = await getClient();
@@ -204,7 +182,7 @@ async function fetchPractitionersByRoles(practitionerRoles) {
       .filter(Boolean)
   )];
 
-  logger.info(`Roles: ${practitionerRoles.length} total → ${ids.length} unique practitioners to fetch`);
+  logger.info(`Roles: ${practitionerRoles.length} total -> ${ids.length} unique practitioners to fetch`);
 
   const practitioners = [];
   const BATCH = 20; // fetch 20 at a time
@@ -225,16 +203,16 @@ async function fetchPractitionersByRoles(practitionerRoles) {
   return practitioners;
 }
 
-/**
- * Fetch all PractitionerRoles using _offset pagination.
- *
- * iHRIS / HAPI FHIR's _getpages token approach is unreliable on production:
- * the server-side search state expires and page 2+ returns empty. Using
- * explicit _offset bypasses this and fetches directly from the DB each time.
- */
-// Only request the fields the transform actually needs — reduces per-resource size by ~90%.
+// Only request the PractitionerRole fields the transform needs.
 const ROLE_ELEMENTS = "id,active,location,practitioner,code,period";
 
+/**
+ * Fetch all PractitionerRoles into memory using _offset pagination.
+ * Used by the /debug endpoint; the sync uses streamPractitionerRoles().
+ *
+ * HAPI FHIR's _getpages tokens expire server-side and page 2+ comes back
+ * empty, so explicit _offset pagination is used instead.
+ */
 async function fetchPractitionerRoles(lastUpdatedFilter = null) {
   const client  = await getClient();
   const PAGE    = parseInt(process.env.IHRIS_PAGE_SIZE || "500", 10);
@@ -275,7 +253,7 @@ async function fetchPractitionerRoles(lastUpdatedFilter = null) {
     baseInactive["_lastUpdated"] = lastUpdatedFilter;
   }
 
-  // Sequential — running both in parallel doubles peak memory (two large arrays at once).
+  // Sequential, to avoid holding two large arrays in memory at once.
   const activeRoles   = await fetchAllByOffset("active",   baseActive);
   const inactiveRoles = await fetchAllByOffset("inactive", baseInactive);
 
@@ -285,11 +263,8 @@ async function fetchPractitionerRoles(lastUpdatedFilter = null) {
 }
 
 /**
- * Stream PractitionerRole resources page-by-page, calling onPage(roles) for each page.
- *
- * The caller processes each page and the array is GC-eligible as soon as onPage() returns —
- * the process never holds all roles in memory at once. This is the low-memory path used by
- * the main sync; fetchPractitionerRoles() above is kept for the /debug endpoint.
+ * Stream PractitionerRole resources page by page, calling onPage(roles) for each
+ * page so that all roles are never held in memory at once.
  */
 async function streamPractitionerRoles(lastUpdatedFilter, onPage) {
   const client   = await getClient();
@@ -300,9 +275,8 @@ async function streamPractitionerRoles(lastUpdatedFilter, onPage) {
     logger.warn(`DEMO MODE: capping at ${MAX_ROLES} roles per stream (active + inactive). Remove IHRIS_MAX_ROLES for production.`);
   }
 
-  // Inner function streams one filter (active or inactive) and calls onPage per page.
-  // Safe to run two of these in parallel because processPage is synchronous —
-  // JS single-threaded event loop guarantees no concurrent mutation of session buckets.
+  // Streams one filter (active or inactive). Two can run concurrently because
+  // onPage handlers are synchronous, so their updates never interleave.
   async function streamOne(label, filter) {
     const baseParams = { ...filter, _elements: ROLE_ELEMENTS };
     if (lastUpdatedFilter) baseParams._lastUpdated = lastUpdatedFilter;
@@ -349,23 +323,20 @@ async function streamPractitionerRoles(lastUpdatedFilter, onPage) {
     return fetched;
   }
 
-  // Run active and inactive streams concurrently — halves wall-clock fetch time.
+  // Stream active and inactive roles concurrently.
   const [activeFetched, inactiveFetched] = await Promise.all([
     streamOne("active",   { active: true  }),
     streamOne("inactive", { active: false }),
   ]);
-  logger.info(`Role streaming complete — ${activeFetched} active + ${inactiveFetched} inactive = ${activeFetched + inactiveFetched} total`);
+  logger.info(`Role streaming complete - ${activeFetched} active + ${inactiveFetched} inactive = ${activeFetched + inactiveFetched} total`);
 }
 
 /**
  * Fetch gender for a known set of practitioner IDs using concurrent _id batch requests.
  *
- * Much faster than paging all practitioners when you already know which IDs you need.
- * Uses a worker-pool to fire `concurrency` requests simultaneously.
- *
  * @param {string[]} ids        - Practitioner IDs to look up
  * @param {object}  [opts]
- * @param {number}  [opts.batchSize=20]  - IDs per request (keep ≤20 to avoid URL limits)
+ * @param {number}  [opts.batchSize=20]  - IDs per request (keep <= 20 to avoid URL limits)
  * @param {number}  [opts.concurrency=10] - Parallel requests in flight
  * @returns {Promise<Map<string,string>>} Map<practitionerId, gender>
  */
@@ -399,7 +370,7 @@ async function fetchGendersForIds(ids, { batchSize = 20, concurrency = 10 } = {}
           if (p.id && p.gender) map.set(p.id, p.gender);
         }
       } catch (err) {
-        logger.warn(`  fetchGendersForIds: batch permanently failed after retries — ${err.message}`);
+        logger.warn(`  fetchGendersForIds: batch permanently failed after retries - ${err.message}`);
       }
       completed += batch.length;
       if (completed % 20000 === 0 || completed >= ids.length) {
@@ -414,67 +385,9 @@ async function fetchGendersForIds(ids, { batchSize = 20, concurrency = 10 } = {}
 }
 
 /**
- * Fetch all Practitioner gender data using _offset pagination with _elements=id,gender.
- *
- * Kept for debugging/diagnostics. The main sync uses fetchGendersForIds() instead,
- * which is faster because it only fetches gender for practitioners referenced in roles.
- */
-async function fetchPractitionerGenders() {
-  const client = await getClient();
-  // Use a larger page size for gender-only fetches — each record is ~50 bytes (just id+gender),
-  // so 2000 per page is safe and cuts the number of round trips by 4x vs the default 500.
-  const PAGE   = parseInt(process.env.IHRIS_GENDER_PAGE_SIZE || "2000", 10);
-  const map    = new Map();
-  let   offset = 0;
-
-  logger.info(`Fetching Practitioner genders from iHRIS (_elements=id,gender, page size ${PAGE})...`);
-
-  while (true) {
-    let res;
-    try {
-      res = await client.get("/Practitioner", {
-        params: { _count: PAGE, _offset: offset, _elements: "id,gender" },
-        validateStatus: () => true,
-      });
-    } catch (err) {
-      logger.warn(`  fetchPractitionerGenders: request at offset=${offset} failed (${err.message}) — stopping with ${map.size} entries`);
-      break;
-    }
-
-    if (res.status >= 400) {
-      logger.warn(`  fetchPractitionerGenders: server returned ${res.status} at offset=${offset} — stopping with ${map.size} entries`);
-      break;
-    }
-
-    const bundle = res.data;
-
-    if (offset === 0 && bundle.total != null) {
-      logger.info(`  Server reports ${bundle.total} Practitioners total`);
-    }
-
-    const entries = (bundle.entry || []).map((e) => e.resource).filter(Boolean);
-    if (entries.length === 0) break;
-
-    for (const p of entries) {
-      if (p.id && p.gender) map.set(p.id, p.gender);
-    }
-    logger.info(`  offset=${offset}: ${entries.length} practitioners (${map.size} with gender so far)`);
-
-    if (entries.length < PAGE) break;
-    offset += PAGE;
-  }
-
-  logger.info(`Fetched gender for ${map.size} practitioners`);
-  return map;
-}
-
-/**
- * Extract the DHIS2 org unit UID from a Location resource's `identifier` array.
- * iHRIS records this explicitly as identifier[].type.coding[].code === "dhis2Id" —
- * this is the authoritative link, present on every ihris-facility-profile Location
- * regardless of region, and doesn't depend on the resource's own `id` happening to
- * be prefixed "DHIS2-{uid}" (which is common but not guaranteed, e.g. RHB/federal
- * entries use human-readable ids like "federal-ministry-of-health").
+ * Extract the DHIS2 org unit UID from a Location's identifier with
+ * type code "dhis2Id". Unlike the "DHIS2-{uid}" id prefix, this identifier is
+ * present on every facility Location (RHB/federal entries use readable ids).
  */
 function extractDhis2IdFromIdentifier(location) {
   for (const ident of location.identifier || []) {
@@ -485,17 +398,9 @@ function extractDhis2IdFromIdentifier(location) {
 }
 
 /**
- * Fetch a Map of every iHRIS Location ID → DHIS2 org unit UID, read from the
- * `dhis2Id` identifier on each Location resource (falls back to the "DHIS2-{uid}"
- * id-prefix convention if the identifier is absent).
- *
- * This is the primary org-unit resolution source used by resolveOrgUnit() in
- * hrh.transform.js — more reliable than name/code matching against DHIS2's
- * dataset-assigned org units, since it's a direct, authoritative link recorded
- * on the iHRIS side rather than an inferred match.
- *
- * Only requests id + identifier (_elements) to keep the payload small — this
- * needs to page through every Location in iHRIS (15k+), not just role-referenced ones.
+ * Fetch a Map of every iHRIS Location ID -> DHIS2 org unit UID, from the
+ * `dhis2Id` identifier (falling back to the "DHIS2-{uid}" id prefix).
+ * This is the primary org unit source for resolveOrgUnit() in hrh.transform.js.
  */
 async function fetchLocationDhis2Map() {
   const client = await getClient();
@@ -504,7 +409,7 @@ async function fetchLocationDhis2Map() {
   let offset = 0;
   let scanned = 0;
 
-  logger.info(`Fetching iHRIS Location → DHIS2 UID map (offset pagination, page size ${PAGE})...`);
+  logger.info(`Fetching iHRIS Location -> DHIS2 UID map (offset pagination, page size ${PAGE})...`);
 
   while (true) {
     const res = await withRetry(
@@ -525,7 +430,7 @@ async function fetchLocationDhis2Map() {
     offset += PAGE;
   }
 
-  logger.info(`Location → DHIS2 UID map: ${map.size}/${scanned} locations have a DHIS2 link`);
+  logger.info(`Location -> DHIS2 UID map: ${map.size}/${scanned} locations have a DHIS2 link`);
   return map;
 }
 
@@ -546,22 +451,17 @@ async function fetchLocationsRaw() {
 }
 
 /**
- * Fetch ALL Location resources from iHRIS by paginating through /Location.
- * Writes logs/ihris-locations.log with one row per facility.
+ * Fetch all Location resources from iHRIS and write logs/ihris-locations.log
+ * with one row per facility.
  *
- * usedLocationIds (optional): a Set/array of iHRIS Location IDs referenced by
- * PractitionerRole.location — when provided, matching rows are annotated as
- * IN_USE so you can see which facilities have staff assigned. Callers should
- * collect this from already-streamed roles rather than passing full role
- * objects, since this function no longer needs to know their shape.
+ * usedLocationIds (optional): Set/array of Location IDs referenced by
+ * PractitionerRoles; matching rows are marked IN_USE.
  */
 async function fetchLocations(usedLocationIds = null) {
   const client = await getClient();
   const usedSet = usedLocationIds instanceof Set ? usedLocationIds : new Set(usedLocationIds || []);
 
-  // /Location's _getpages token pagination returns empty on page 2 on this
-  // HAPI FHIR server (same issue PractitionerRole has) — use explicit _offset
-  // pagination instead, which hits the DB directly each time.
+  // _getpages tokens are unreliable on this HAPI FHIR server; use _offset.
   const PAGE = parseInt(process.env.IHRIS_LOCATION_PAGE_SIZE || "500", 10);
   logger.info(`Fetching ALL Location resources from iHRIS (offset pagination, page size ${PAGE})...`);
 
@@ -597,8 +497,7 @@ async function fetchLocations(usedLocationIds = null) {
     logger.warn(`  Location pagination may be incomplete: fetched ${locations.length} but server reported ${serverTotal} total`);
   }
 
-  // Also ensure any DHIS2-linked locations from roles are included —
-  // HAPI FHIR sometimes excludes these from general paginated search.
+  // Fetch role-referenced locations missing from the paginated search.
   if (usedSet.size > 0) {
     const existingIds = new Set(locations.map(l => l.id));
     const missingIds = [...usedSet].filter(id => !existingIds.has(id));
@@ -623,7 +522,7 @@ async function fetchLocations(usedLocationIds = null) {
   // Write log file
   const ts = new Date().toISOString();
   const lines = [
-    `# iHRIS Facilities log — generated ${ts}`,
+    `# iHRIS Facilities log - generated ${ts}`,
     `# Total: ${locations.length} Location resources (${pageCount} page(s))`,
     `# Columns: STATUS | IN_USE | DHIS2_UID       | iHRIS_ID                             | Name                                               | Physical Type`,
     `# STATUS: DHIS2 = has DHIS2 UID (syncs to DHIS2), LOCAL = no DHIS2 UID (skipped during sync)`,
@@ -669,7 +568,7 @@ async function fetchLocations(usedLocationIds = null) {
   fs.mkdirSync(path.dirname(LOCATIONS_LOG), { recursive: true });
   fs.writeFileSync(LOCATIONS_LOG, lines.join("\n"), "utf8");
 
-  logger.info(`iHRIS facilities log → ${LOCATIONS_LOG} (${withDhis2} DHIS2-linked, ${withoutDhis2} LOCAL-only)`);
+  logger.info(`iHRIS facilities log written to logs/${path.basename(LOCATIONS_LOG)} (${withDhis2} DHIS2-linked, ${withoutDhis2} LOCAL-only)`);
 
   return { total: locations.length, withDhis2, withoutDhis2 };
 }
@@ -679,20 +578,16 @@ async function warmSession() {
   await getSessionCookie();
 }
 
-/**
- * Force a fresh login on next request (call if you get a 401 mid-sync)
- */
+/** Force a fresh login on the next request (e.g. after a 401). */
 function invalidateSession() {
   sessionCookie = null;
   sessionExpiry = null;
 }
 
 module.exports = {
-  fetchPractitioners,
   fetchPractitionerRoles,
   streamPractitionerRoles,
   fetchPractitionersByRoles,
-  fetchPractitionerGenders,
   fetchGendersForIds,
   fetchLocations,
   fetchLocationsRaw,

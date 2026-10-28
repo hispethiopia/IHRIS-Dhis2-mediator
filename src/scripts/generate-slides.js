@@ -1,5 +1,3 @@
-// src/scripts/generate-slides.js
-//
 // Generates a PowerPoint presentation for the iHRIS → DHIS2 HRH Mediator project.
 //
 // Usage: node src/scripts/generate-slides.js
@@ -11,7 +9,7 @@ const path = require("path");
 
 const OUT = path.join(__dirname, "../../iHRIS_DHIS2_Mediator_Presentation.pptx");
 
-// ── Colour palette ────────────────────────────────────────────────────────────
+// Colour palette
 const C = {
   green:      "006837",  // MoH Ethiopia green
   darkGreen:  "004D26",
@@ -27,7 +25,7 @@ const C = {
   teal:       "00695C",
 };
 
-// ── Reusable style helpers ────────────────────────────────────────────────────
+// Reusable style helpers
 function addBackground(slide, color) {
   slide.addShape("rect", { x: 0, y: 0, w: "100%", h: "100%", fill: { color } });
 }
@@ -99,13 +97,13 @@ function addTable(slide, head, rows, opts = {}) {
   });
 }
 
-// ── Build presentation ────────────────────────────────────────────────────────
+// Build presentation
 async function build() {
   const pptx = new PptxGenJS();
   pptx.layout = "LAYOUT_WIDE"; // 13.33 × 7.5 — use standard 10×7.5
   pptx.layout = "LAYOUT_16x9";
 
-  // ── Slide 1: Title ─────────────────────────────────────────────────────────
+  // Slide 1: Title
   {
     const s = pptx.addSlide();
     addBackground(s, C.green);
@@ -143,7 +141,7 @@ async function build() {
     s.addShape("rect", { x: 0, y: 7.1, w: "100%", h: 0.18, fill: { color: C.yellow } });
   }
 
-  // ── Slide 2: Agenda ─────────────────────────────────────────────────────────
+  // Slide 2: Agenda
   {
     const s = pptx.addSlide();
     slideTitle(s, "Agenda");
@@ -161,7 +159,7 @@ async function build() {
     ], { y: 1.3, fontSize: 18 });
   }
 
-  // ── Slide 3: The Problem ────────────────────────────────────────────────────
+  // Slide 3: The Problem
   {
     const s = pptx.addSlide();
     slideTitle(s, "The Problem");
@@ -198,7 +196,7 @@ async function build() {
     ], { x: 5.3, y: 1.85, w: 4.1, h: 4.1, fontSize: 14, color: C.darkGray });
   }
 
-  // ── Slide 4: What is the Mediator? ─────────────────────────────────────────
+  // Slide 4: What is the Mediator?
   {
     const s = pptx.addSlide();
     slideTitle(s, "What is the Mediator?");
@@ -215,7 +213,7 @@ async function build() {
     ], { y: 1.3, fontSize: 17 });
   }
 
-  // ── Slide 5: System Architecture ───────────────────────────────────────────
+  // Slide 5: System Architecture
   {
     const s = pptx.addSlide();
     slideTitle(s, "System Architecture");
@@ -264,7 +262,7 @@ async function build() {
     ], { x: 0.3, y: 1.3, w: 9.4, h: 0.85, fontSize: 12, color: C.gray });
   }
 
-  // ── Slide 6: Data Flow Pipeline ─────────────────────────────────────────────
+  // Slide 6: Data Flow Pipeline
   {
     const s = pptx.addSlide();
     slideTitle(s, "Data Flow Pipeline");
@@ -312,7 +310,7 @@ async function build() {
     });
   }
 
-  // ── Slide 7: Cadre Mapping ──────────────────────────────────────────────────
+  // Slide 7: Cadre Mapping
   {
     const s = pptx.addSlide();
     slideTitle(s, "Health Cadre Mapping");
@@ -337,7 +335,7 @@ async function build() {
     );
   }
 
-  // ── Slide 8: Dataset Configuration ─────────────────────────────────────────
+  // Slide 8: Dataset Configuration
   {
     const s = pptx.addSlide();
     slideTitle(s, "DHIS2 Dataset Configuration");
@@ -368,7 +366,7 @@ async function build() {
     });
   }
 
-  // ── Slide 9: Metrics Tracked ───────────────────────────────────────────────
+  // Slide 9: Metrics Tracked
   {
     const s = pptx.addSlide();
     slideTitle(s, "HR Metrics Tracked");
@@ -395,7 +393,7 @@ async function build() {
     });
   }
 
-  // ── Slide 10: Key Features ──────────────────────────────────────────────────
+  // Slide 10: Key Features
   {
     const s = pptx.addSlide();
     slideTitle(s, "Key Features");
@@ -428,7 +426,7 @@ async function build() {
     });
   }
 
-  // ── Slide 11: Performance Highlights ───────────────────────────────────────
+  // Slide 11: Performance Highlights
   {
     const s = pptx.addSlide();
     slideTitle(s, "Performance Highlights");
@@ -483,13 +481,13 @@ async function build() {
     });
   }
 
-  // ── Slide 12: Web Interface ─────────────────────────────────────────────────
+  // Slide 12: Web Interface
   {
     const s = pptx.addSlide();
     slideTitle(s, "Web Interface");
     accentBar(s);
 
-    s.addText("A single-page application (no build step required — vanilla HTML/CSS/JS) with 5 tabs:", {
+    s.addText("A single-page application (no build step required — vanilla HTML/CSS/JS) with 4 tabs:", {
       x: 0.4, y: 1.2, w: 9.2, h: 0.4, fontSize: 14, color: C.gray, fontFace: "Calibri",
     });
 
@@ -498,7 +496,6 @@ async function build() {
       [
         ["Dashboard",      "Sync control panel — period input, dry-run toggle, animated 5-step pipeline progress, last sync status"],
         ["Data Preview",   "Dry-run results — dataset summaries, cadre table, per-org-unit breakdown, approve/reject bar"],
-        ["Verify in DHIS2","Reads stored data values from DHIS2 to confirm the push landed correctly"],
         ["Sync History",   "Table of last 100 completed syncs — period, type, status, counts, duration, timestamp"],
         ["Logs",           "Real-time log stream (SSE) — last 300 lines on connect, color-coded levels, pause/clear controls"],
       ],
@@ -506,7 +503,7 @@ async function build() {
     );
   }
 
-  // ── Slide 13: Deployment ────────────────────────────────────────────────────
+  // Slide 13: Deployment
   {
     const s = pptx.addSlide();
     slideTitle(s, "Deployment Options");
@@ -539,7 +536,7 @@ async function build() {
     ], { x: 0.5, y: 4.65, w: 8.9, h: 1.9, fontSize: 13, color: C.darkGray });
   }
 
-  // ── Slide 14: Security ──────────────────────────────────────────────────────
+  // Slide 14: Security
   {
     const s = pptx.addSlide();
     slideTitle(s, "Security Controls");
@@ -561,7 +558,7 @@ async function build() {
     );
   }
 
-  // ── Slide 15: Summary & Next Steps ─────────────────────────────────────────
+  // Slide 15: Summary & Next Steps
   {
     const s = pptx.addSlide();
     addBackground(s, C.darkGreen);
@@ -604,9 +601,9 @@ async function build() {
     });
   }
 
-  // ── Write file ────────────────────────────────────────────────────────────
+  // Write file
   await pptx.writeFile({ fileName: OUT });
-  console.log(`\nPresentation saved → ${OUT}\n`);
+  console.log(`\nPresentation saved → ${path.relative(process.cwd(), OUT)}\n`);
 }
 
 build().catch(err => {

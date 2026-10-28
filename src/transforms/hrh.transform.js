@@ -1,6 +1,4 @@
-// src/transforms/hrh.transform.js
-//
-// Maps iHRIS FHIR resources → DHIS2 aggregate dataValueSets
+// Maps iHRIS FHIR resources -> DHIS2 aggregate dataValueSets
 // UC-P2-02: Active workforce (DE_*_END_OF_YEAR)
 // UC-P2-03: Left institution (DE_*_LEAVING)
 // UC-P2-04: Recruited (DE_*_RECRUITED)
@@ -15,7 +13,7 @@ const fs     = require("fs");
 const logger = require("../logger");
 const { parseEthiopianPeriod, toDhis2Period } = require("../utils/ethiopian-calendar");
 
-// Local iHRIS-ID → DHIS2 UID overrides (for locations not yet linked in iHRIS)
+// Local iHRIS-ID -> DHIS2 UID overrides (for locations not yet linked in iHRIS)
 let _locationMapping = null;
 function getLocationMapping() {
   if (_locationMapping) return _locationMapping;
@@ -31,9 +29,7 @@ function getLocationMapping() {
   return _locationMapping;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CADRE MAP — maps iHRIS job title keywords → DHIS2 cadre env key prefix
-// ─────────────────────────────────────────────────────────────────────────────
+// Maps iHRIS job title keywords -> DHIS2 cadre env key prefix
 const CADRE_MAP = [
   {
     key: "MIDWIVES",
@@ -59,45 +55,12 @@ const CADRE_MAP = [
     key: "ESOS",
     keywords: ["emergency surgical", "eso "],
   },
-  // Everything else → OTHER_HEALTH (must be last)
+  // Everything else -> OTHER_HEALTH (must be last)
   {
     key: "OTHER_HEALTH",
     keywords: [],  // catch-all
   },
 ];
-
-/**
- * Extract gender from a FHIR Practitioner resource.
- * Tries the standard FHIR gender field first, then iHRIS v5 extension patterns.
- * Returns "male", "female", or null.
- */
-function extractGender(practitioner) {
-  if (!practitioner) return null;
-
-  // Standard FHIR gender field
-  const g = practitioner.gender?.toLowerCase();
-  if (g === "male" || g === "m") return "male";
-  if (g === "female" || g === "f") return "female";
-
-  // iHRIS v5 often stores gender in extensions (flat or nested)
-  for (const ext of practitioner.extension || []) {
-    // Flat: { url: "...", valueCoding: { code: "male" } }
-    const code = ext.valueCoding?.code?.toLowerCase() || ext.valueCode?.toLowerCase();
-    if (code === "male" || code === "m") return "male";
-    if (code === "female" || code === "f") return "female";
-
-    // Nested: { url: "...", extension: [{ url: "gender", valueCoding: { code: "male" } }] }
-    for (const sub of ext.extension || []) {
-      if (sub.url?.toLowerCase().includes("gender")) {
-        const subCode = sub.valueCoding?.code?.toLowerCase() || sub.valueCode?.toLowerCase();
-        if (subCode === "male" || subCode === "m") return "male";
-        if (subCode === "female" || subCode === "f") return "female";
-      }
-    }
-  }
-
-  return null;
-}
 
 /**
  * Resolve which DHIS2 cadre key a PractitionerRole belongs to.
@@ -124,14 +87,13 @@ function resolveCadre(role) {
  * Resolve DHIS2 org unit UID from PractitionerRole.location reference.
  *
  * Priority order:
- *  1. locationDhis2Map — authoritative iHRIS Location.identifier[dhis2Id] lookup
+ *  1. locationDhis2Map - authoritative iHRIS Location.identifier[dhis2Id] lookup
  *     (see ihris.service.js#fetchLocationDhis2Map). Present on every facility
  *     regardless of region; doesn't depend on name matching so it can't collide
  *     with a same-named facility in a different woreda.
- *  2. "DHIS2-{uid}" id-prefix convention (cheap, no map needed, kept as a
- *     fallback in case locationDhis2Map wasn't supplied, e.g. batch/debug paths).
- *  3. orgUnitMap — matches DHIS2's dataset-assigned org units by code/name.
- *  4. config/location-mapping.json — manual overrides for anything still unresolved.
+ *  2. "DHIS2-{uid}" id-prefix convention (fallback when no locationDhis2Map is supplied).
+ *  3. orgUnitMap - matches DHIS2's dataset-assigned org units by code/name.
+ *  4. config/location-mapping.json - manual overrides for anything still unresolved.
  */
 function resolveOrgUnit(role, orgUnitMap, locationDhis2Map = null) {
   const ref = role.location?.[0]?.reference || "";
@@ -146,15 +108,7 @@ function resolveOrgUnit(role, orgUnitMap, locationDhis2Map = null) {
   return orgUnitMap[id] || orgUnitMap[display] || getLocationMapping()[id] || getLocationMapping()[display] || null;
 }
 
-// parsePeriod interprets period strings as Ethiopian calendar and returns
-// the equivalent Gregorian date range for filtering iHRIS role dates.
-const parsePeriod = parseEthiopianPeriod;
-
-// ─────────────────────────────────────────────────────────────────────────────
-// RESULT BUILDER
-// Shared by both transformToDhis2 (batch) and TransformSession (streaming).
-// Takes the four accumulated bucket maps and builds the final output.
-// ─────────────────────────────────────────────────────────────────────────────
+// Builds the dataValueSets and summaries from the four accumulated bucket maps.
 function _buildResults(period, beginningBuckets, activeBuckets, attritionBuckets, recruitedBuckets, categoryOptionCombos, orgUnitDatasets, orgUnitNames) {
   // DHIS2 period id actually sent on the wire (annual periods get the "Nov"
   // financial-year suffix; quarterly/monthly periods pass through unchanged).
@@ -177,7 +131,7 @@ function _buildResults(period, beginningBuckets, activeBuckets, attritionBuckets
     [process.env.DHIS2_DATASET_REGION]:          "Region",
   };
 
-  // Maps dataset ID → env var prefix for data element lookup.
+  // Maps dataset ID -> env var prefix for data element lookup.
   // Facility datasets share the same DE_ prefix (no infix).
   // Admin-level datasets have their own sets of data elements.
   const DATASET_DE_INFIX = {
@@ -242,7 +196,7 @@ function _buildResults(period, beginningBuckets, activeBuckets, attritionBuckets
   logger.info(`Data values: ${totalValues} across ${dataValueSets.length} facility dataset(s)`);
   dataValueSets.forEach(d => logger.info(`  [${d.label}] ${d.dataValues.length} values`));
 
-  // ── Summaries ─────────────────────────────────────────────────────────────
+  // Summaries
   const cadreSummary = CADRE_MAP.map(({ key }) => ({
     cadre: key,
     active:    Object.values(activeBuckets).reduce((s, b) => s + (b[key]?.male || 0) + (b[key]?.female || 0), 0),
@@ -269,19 +223,12 @@ function _buildResults(period, beginningBuckets, activeBuckets, attritionBuckets
   return { dataValueSets, cadreSummary, orgUnitBreakdown };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// STREAMING TRANSFORM SESSION
-//
-// Use this when you can't hold all PractitionerRole resources in memory at once.
-// Call processPage(roles, genderMap) for each page as it arrives from iHRIS,
-// then call getResults() when all pages have been processed.
-//
-// Memory profile: only the current page + four small bucket maps are live at
-// any given time. Pages are GC-eligible as soon as processPage() returns.
-// ─────────────────────────────────────────────────────────────────────────────
+// Streaming transform: call processPage(roles, genderMap) for each page as it
+// arrives from iHRIS, then getResults() once all pages are processed. Only the
+// current page and the bucket maps are held in memory.
 class TransformSession {
   constructor(orgUnitMap, period, categoryOptionCombos = {}, orgUnitDatasets = {}, locationDhis2Map = null) {
-    const { start, end } = parsePeriod(period);
+    const { start, end } = parseEthiopianPeriod(period);
     this._period      = period;
     this._periodStart = start;
     this._periodEnd   = end;
@@ -290,7 +237,7 @@ class TransformSession {
     this._dsMap       = orgUnitDatasets;
     this._locMap      = locationDhis2Map;
 
-    // Buckets: { orgUid → { CADRE_KEY → { male: 0, female: 0 } } }
+    // Buckets: { orgUid -> { CADRE_KEY -> { male: 0, female: 0 } } }
     this._beginning = {};
     this._active    = {};
     this._attrition = {};
@@ -307,7 +254,6 @@ class TransformSession {
   /**
    * Process one page of PractitionerRole resources.
    * genderMap is Map<practitionerId, "male"|"female">.
-   * After this returns, the roles array is no longer referenced here and can be GC'd.
    */
   processPage(roles, genderMap) {
     const { _periodStart: ps, _periodEnd: pe, _orgUnitMap: om, _dsMap: ds, _locMap: lm } = this;
@@ -329,7 +275,7 @@ class TransformSession {
       if (gender !== "male" && gender !== "female") {
         if (!this._genderLogged) {
           this._genderLogged = true;
-          logger.warn(`Gender missing for practitioner ${practId} — ensure gender is stored in the standard FHIR gender field in iHRIS.`);
+          logger.warn(`Gender missing for practitioner ${practId} - ensure gender is stored in the standard FHIR gender field in iHRIS.`);
         }
         this._noGender++;
         continue;
@@ -366,109 +312,4 @@ class TransformSession {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// BATCH TRANSFORM (kept for /debug endpoint which works with small samples)
-// ─────────────────────────────────────────────────────────────────────────────
-/**
- * @param {Array}  practitionerRoles
- * @param {Array}  practitioners
- * @param {Object} orgUnitMap        { code|name → dhis2OrgUnitUID }
- * @param {string} period            DHIS2 period string
- * @param {{ male: string, female: string }} categoryOptionCombos  COC UIDs by gender
- * @param {Object} orgUnitNames      { uid → displayName }
- * @param {Object} orgUnitDatasets   { uid → facilityDatasetId }
- * @param {Map}    [locationDhis2Map] iHRIS Location ID → DHIS2 UID (see resolveOrgUnit)
- * @returns {{ dataValueSets, cadreSummary, orgUnitBreakdown }}
- */
-function transformToDhis2(practitionerRoles, practitioners, orgUnitMap, period, categoryOptionCombos = {}, orgUnitNames = {}, orgUnitDatasets = {}, locationDhis2Map = null) {
-  const { start: periodStart, end: periodEnd } = parsePeriod(period);
-  logger.info(`Ethiopian period ${period} → Gregorian ${periodStart.toISOString().slice(0,10)} to ${periodEnd.toISOString().slice(0,10)}`);
-
-  // Index practitioners by id for gender lookup
-  const practById = {};
-  for (const p of practitioners) practById[p.id] = p;
-
-  // Buckets: { orgUid: { CADRE_KEY: { male: 0, female: 0 } } }
-  const beginningBuckets = {};
-  const activeBuckets    = {};
-  const attritionBuckets = {};
-  const recruitedBuckets = {};
-
-  const ensure = (store, uid) => {
-    if (!store[uid]) {
-      store[uid] = {};
-      for (const { key } of CADRE_MAP) store[uid][key] = { male: 0, female: 0 };
-    }
-  };
-
-  let processed = 0, skippedOrgUnit = 0, skippedGender = 0, skippedNoDataset = 0;
-  let genderDiagnosticLogged = false;
-  const noDatasetUids = new Set();
-
-  for (const role of practitionerRoles) {
-    const orgUid = resolveOrgUnit(role, orgUnitMap, locationDhis2Map);
-    if (!orgUid) { skippedOrgUnit++; continue; }
-
-    // Only process org units that belong to a known facility HR dataset
-    if (!orgUnitDatasets[orgUid]) { skippedNoDataset++; noDatasetUids.add(orgUid); continue; }
-
-    const practRef = role.practitioner?.reference || "";
-    const practId = practRef.split("/").pop();
-    const practitioner = practById[practId];
-    const gender = extractGender(practitioner);
-
-    if (gender !== "male" && gender !== "female") {
-      if (!genderDiagnosticLogged) {
-        genderDiagnosticLogged = true;
-        logger.warn(
-          `Gender missing for practitioner ${practId}. ` +
-          `FHIR gender="${practitioner?.gender}", ` +
-          `extensions=${JSON.stringify((practitioner?.extension || []).slice(0, 3))}. ` +
-          `If gender is stored differently in iHRIS, update extractGender() in hrh.transform.js.`
-        );
-      }
-      skippedGender++;
-      continue;
-    }
-
-    const cadre = resolveCadre(role);
-    const hireDate = role.period?.start ? new Date(role.period.start) : null;
-    const endDate  = role.period?.end   ? new Date(role.period.end)   : null;
-    const isActive = role.active !== false && !endDate;
-
-    // Present at beginning of period: started before period start (or unknown start)
-    // AND had not yet left by period start
-    const wasAtBeginning = (hireDate === null || hireDate <= periodStart)
-                        && (endDate  === null || endDate  >= periodStart);
-    if (wasAtBeginning) {
-      ensure(beginningBuckets, orgUid);
-      beginningBuckets[orgUid][cadre][gender]++;
-    }
-    if (isActive) {
-      ensure(activeBuckets, orgUid);
-      activeBuckets[orgUid][cadre][gender]++;
-    }
-    if (!isActive && endDate && endDate >= periodStart && endDate <= periodEnd) {
-      ensure(attritionBuckets, orgUid);
-      attritionBuckets[orgUid][cadre][gender]++;
-    }
-    if (hireDate && hireDate >= periodStart && hireDate <= periodEnd) {
-      ensure(recruitedBuckets, orgUid);
-      recruitedBuckets[orgUid][cadre][gender]++;
-    }
-
-    processed++;
-  }
-
-  logger.info(
-    `Roles processed: ${processed}, skipped (no org unit): ${skippedOrgUnit}, ` +
-    `skipped (no facility dataset): ${skippedNoDataset}, skipped (no gender): ${skippedGender}`
-  );
-  if (noDatasetUids.size > 0) {
-    logger.warn(`Org unit UIDs with no HR facility dataset in DHIS2 (need dataset assignment): ${[...noDatasetUids].join(', ')}`);
-  }
-
-  return _buildResults(period, beginningBuckets, activeBuckets, attritionBuckets, recruitedBuckets, categoryOptionCombos, orgUnitDatasets, orgUnitNames);
-}
-
-module.exports = { transformToDhis2, TransformSession, resolveCadre, CADRE_MAP };
+module.exports = { TransformSession, resolveCadre, CADRE_MAP };

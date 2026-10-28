@@ -1,6 +1,4 @@
-// src/services/sync.service.js
-// Orchestrates the full iHRIS → DHIS2 HRH sync pipeline
-// Implements UC-P2-01 main flow (Steps 1-6)
+// Orchestrates the iHRIS -> DHIS2 HRH sync pipeline (UC-P2-01)
 
 "use strict";
 const ihrisService = require("./ihris.service");
@@ -9,21 +7,10 @@ const { TransformSession } = require("../transforms/hrh.transform");
 const { getCurrentEthiopianYear } = require("../utils/ethiopian-calendar");
 const logger = require("../logger");
 
-/**
- * Run a full HRH sync for the given period.
- *
- * UC-P2-01 flow:
- *  Step 1 — Extract HR data from iHRIS (Practitioner + PractitionerRole)
- *  Step 2 — Transform: aggregate by cadre, gender, facility for each dataset
- *  Step 3 — Validate: check counts, warn on missing mappings
- *  Step 4 — Approval gate (dryRun mode returns payload without pushing)
- *  Step 5 — Transmit to DHIS2 (all three dataValueSets)
- *  Step 6 — Return import summaries
- *
- * @param {string}  period  - DHIS2 period string e.g. "2024Q1", "202401", "2024"
- * @param {boolean} dryRun  - If true, build payload but skip pushing to DHIS2
- * @param {string}  lastUpdated - Optional iHRIS _lastUpdated filter (e.g. "gt2024-01-01")
- */
+// Payload built by the most recent dry run, kept so an approval can push
+// exactly what was previewed without re-extracting from iHRIS.
+let pendingDryRun = null;
+
 function logCadreSummaryTable(rows) {
   const COL = [22, 8, 8, 9];
   const pad = (s, n) => String(s).padStart(n);
@@ -36,15 +23,70 @@ function logCadreSummaryTable(rows) {
   }
 }
 
+/**
+ * Push each dataset's values to DHIS2, one dataset at a time.
+ * Returns { importResults, success }.
+ */
+async function pushDataValueSets(dataValueSets) {
+  const importResults = [];
+  for (const dvs of dataValueSets) {
+    if (dvs.dataValues.length === 0) {
+      logger.warn(`[${dvs.label}] No data values - skipping push`);
+      importResults.push({ label: dvs.label, status: "SKIPPED" });
+      continue;
+    }
+
+    logger.info(`  Pushing [${dvs.label}]: ${dvs.dataValues.length} values...`);
+    try {
+      const summary = await dhis2Service.pushDataValueSet({
+        dataSet: dvs.dataSet,
+        period: dvs.period,
+        dataValues: dvs.dataValues,
+      });
+
+      if (summary.status === "ERROR") {
+        logger.error(`[${dvs.label}] DHIS2 returned ERROR status`, { summary });
+      }
+
+      importResults.push({
+        label: dvs.label,
+        status: summary.status,
+        imported: summary.importCount?.imported,
+        updated: summary.importCount?.updated,
+        ignored: summary.importCount?.ignored,
+        conflicts: summary.conflicts?.length || 0,
+      });
+    } catch (err) {
+      logger.error(`[${dvs.label}] Push failed: ${err.message}`);
+      importResults.push({ label: dvs.label, status: "ERROR", error: err.message });
+    }
+  }
+
+  const success = importResults.every(
+    (r) => r.status === "SUCCESS" || r.status === "WARNING" || r.status === "SKIPPED"
+  );
+  return { importResults, success };
+}
+
+/**
+ * Run a full HRH sync for the given period.
+ *
+ *  1. Validate the configured DHIS2 datasets
+ *  2. Load the DHIS2 org unit map and gender category option combos
+ *  3. Stream PractitionerRoles from iHRIS and fetch practitioner genders
+ *  4. Transform: aggregate by cadre, gender and facility per dataset
+ *  5. Push to DHIS2 - or, in dry-run mode, keep the payload for approval
+ *
+ * @param {string}  period      - Ethiopian period, e.g. "2018" or "2018Q3" (defaults to current year)
+ * @param {boolean} dryRun      - Build the payload but skip the DHIS2 push
+ * @param {string}  lastUpdated - Optional iHRIS _lastUpdated filter (e.g. "gt2024-01-01")
+ */
 async function runSync(period, dryRun = false, lastUpdated = null) {
   const syncPeriod = period || getCurrentEthiopianYear();
   const startTime = Date.now();
 
-  logger.info("═══════════════════════════════════════════════════════");
-  logger.info(`  iHRIS → DHIS2 HRH Sync`);
-  logger.info(`  Period (Ethiopian) : ${syncPeriod}`);
-  logger.info(`  Dry Run : ${dryRun}`);
-  logger.info("═══════════════════════════════════════════════════════");
+  logger.info(`Starting HRH sync: period=${syncPeriod} dryRun=${dryRun}`);
+  pendingDryRun = null;
 
   const result = {
     period: syncPeriod,
@@ -57,8 +99,8 @@ async function runSync(period, dryRun = false, lastUpdated = null) {
   };
 
   try {
-    // ── Step 1: Validate DHIS2 datasets ──────────────────────────────────────
-    logger.info("Step 1/5 — Validating DHIS2 datasets...");
+    // Step 1: Validate DHIS2 datasets
+    logger.info("Step 1/5 - Validating DHIS2 datasets...");
     const facilityDatasetIds = dhis2Service.getFacilityDatasetIds();
 
     if (facilityDatasetIds.length === 0) {
@@ -69,7 +111,7 @@ async function runSync(period, dryRun = false, lastUpdated = null) {
       );
     }
 
-    // Validate all configured datasets in parallel; admin-level ones are optional
+    // Validate all configured datasets in parallel
     const allDatasetIds = dhis2Service.getAllDatasetIds();
     const validationResults = await Promise.all(
       allDatasetIds.map(id => dhis2Service.validateDataset(id).then(v => ({ id, valid: v })))
@@ -78,8 +120,8 @@ async function runSync(period, dryRun = false, lastUpdated = null) {
     if (invalidDs) throw new Error(`DHIS2 dataset not found or inaccessible: ${invalidDs.id}`);
     result.steps.validateDatasets = "OK";
 
-    // ── Step 2: Load DHIS2 org unit map + gender category option combos ──────
-    logger.info("Step 2/5 — Loading DHIS2 org units and gender COCs...");
+    // Step 2: Load DHIS2 org unit map + gender category option combos
+    logger.info("Step 2/5 - Loading DHIS2 org units and gender COCs...");
     const [orgUnitMap, categoryOptionCombos] = await Promise.all([
       dhis2Service.fetchOrgUnitMap(),
       dhis2Service.fetchGenderCategoryOptionCombos(),
@@ -88,23 +130,17 @@ async function runSync(period, dryRun = false, lastUpdated = null) {
     result.steps.orgUnits = Object.keys(dhis2Service.getOrgUnitNames()).length;
     result.steps.orgUnitsWithDataset = Object.keys(orgUnitDatasets).length;
     result.steps.categoryOptionCombos = categoryOptionCombos;
-    logger.info(`Loaded ${result.steps.orgUnits} org units (${result.steps.orgUnitsWithDataset} with facility dataset), COCs — Male: ${categoryOptionCombos.male}, Female: ${categoryOptionCombos.female}`);
+    logger.info(`Loaded ${result.steps.orgUnits} org units (${result.steps.orgUnitsWithDataset} with facility dataset), COCs - Male: ${categoryOptionCombos.male}, Female: ${categoryOptionCombos.female}`);
 
-    // ── Steps 3+4: Extract from iHRIS and transform (two-pass) ──────────────
-    // Pass 1: stream roles to collect unique practitioner IDs (no processing yet).
-    // Pass 2: fetch genders for only those IDs (targeted + concurrent), then
-    //         re-stream roles and transform with the complete gender map.
-    //
-    // This avoids paging through all ~400K+ practitioners for gender when only
-    // ~325K are actually referenced by roles. Wall-clock time ≈ 2 × stream_time
-    // + gender_fetch_time (~50-70 min total) vs the previous approach that
-    // blocked streaming until a full practitioner scan finished (~7 hours).
-    logger.info("Step 3/5 — Pass 1: streaming roles to collect practitioner IDs...");
+    // Steps 3+4: Extract from iHRIS and transform (two passes)
+    // Pass 1 streams roles to collect the referenced practitioner IDs, so genders
+    // are fetched only for those rather than for every practitioner in iHRIS.
+    // Pass 2 re-streams roles and transforms them with the complete gender map.
+    logger.info("Step 3/5 - Pass 1: streaming roles to collect practitioner IDs...");
     await ihrisService.warmSession();
 
-    // Kick off the authoritative Location→DHIS2 UID map fetch concurrently with
-    // Pass 1 — it's an independent paginated read of every iHRIS Location and
-    // doesn't depend on role data. Awaited just before Pass 2 needs it.
+    // The Location -> DHIS2 UID map doesn't depend on role data, so fetch it
+    // alongside Pass 1 and await it just before Pass 2.
     const locationDhis2MapPromise = ihrisService.fetchLocationDhis2Map();
 
     const practitionerIdSet = new Set();
@@ -123,15 +159,14 @@ async function runSync(period, dryRun = false, lastUpdated = null) {
 
     logger.info(`Pass 1 complete: ${totalRoles} roles, ${practitionerIdSet.size} unique practitioners, ${locationIdSet.size} unique locations`);
 
-    // Write the iHRIS facilities log in the background (doesn't block the sync).
-    // Pass the role-referenced location IDs so IN_USE reflects which facilities
-    // actually have staff assigned — needed for the reconcile-locations.js workflow.
+    // Write the iHRIS facilities log in the background for reconcile-locations.js.
+    // Role-referenced location IDs mark which facilities have staff (IN_USE).
     ihrisService.fetchLocations(locationIdSet).catch(err =>
       logger.warn(`Could not write iHRIS locations log: ${err.message}`)
     );
 
-    // ── Step 4: Targeted concurrent gender fetch ──────────────────────────────
-    logger.info("Step 4/5 — Fetching genders for role practitioners (targeted)...");
+    // Step 4: Targeted concurrent gender fetch
+    logger.info("Step 4/5 - Fetching genders for role practitioners (targeted)...");
     const concurrency = parseInt(process.env.IHRIS_GENDER_CONCURRENCY || "10", 10);
     const genderMap = await ihrisService.fetchGendersForIds([...practitionerIdSet], { concurrency });
 
@@ -144,7 +179,7 @@ async function runSync(period, dryRun = false, lastUpdated = null) {
     result.steps.locationDhis2Map = locationDhis2Map.size;
 
     // Pass 2: re-stream roles and transform with the complete gender map
-    logger.info("Step 4/5 — Pass 2: re-streaming roles and transforming...");
+    logger.info("Step 4/5 - Pass 2: re-streaming roles and transforming...");
     const session = new TransformSession(orgUnitMap, syncPeriod, categoryOptionCombos, orgUnitDatasets, locationDhis2Map);
 
     await ihrisService.streamPractitionerRoles(lastUpdated, async (page) => {
@@ -164,7 +199,7 @@ async function runSync(period, dryRun = false, lastUpdated = null) {
     result.orgUnitBreakdown = orgUnitBreakdown;
     logCadreSummaryTable(cadreSummary);
 
-    // Build DE UID → env key name map for display
+    // Build DE UID -> env key name map for display
     const deUidToName = {};
     for (const [key, val] of Object.entries(process.env)) {
       if (key.startsWith('DE_') && val && val.length > 5 && !val.includes('uid_here') && !val.includes('NOT_FOUND')) {
@@ -173,7 +208,7 @@ async function runSync(period, dryRun = false, lastUpdated = null) {
     }
     const ouNames = dhis2Service.getOrgUnitNames();
 
-    // Detailed breakdown: per dataset → per data element → per org unit
+    // Detailed breakdown: per dataset -> per data element -> per org unit
     result.dataElementsDetail = dataValueSets.map(dvs => {
       const byDE = {};
       for (const dv of dvs.dataValues) {
@@ -204,9 +239,9 @@ async function runSync(period, dryRun = false, lastUpdated = null) {
       };
     });
 
-    // ── Step 5: Push to DHIS2 (or dry run) ────────────────────────────────────
+    // Step 5: Push to DHIS2 (or dry run)
     if (dryRun) {
-      logger.info("Step 5/5 — DRY RUN: skipping push to DHIS2");
+      logger.info("Step 5/5 - DRY RUN: skipping push to DHIS2");
       logger.info("Payload preview (first 5 values per dataset):");
       for (const dvs of dataValueSets) {
         logger.info(`  [${dvs.label}] ${dvs.dataValues.length} values`);
@@ -216,55 +251,20 @@ async function runSync(period, dryRun = false, lastUpdated = null) {
       }
       result.steps.push = "DRY_RUN";
       result.success = true;
+      pendingDryRun = { period: syncPeriod, dataValueSets, result };
     } else {
-      logger.info("Step 5/5 — Pushing to DHIS2 (one dataset at a time)...");
-
-      const importResults = [];
-      for (const dvs of dataValueSets) {
-        if (dvs.dataValues.length === 0) {
-          logger.warn(`[${dvs.label}] No data values — skipping push`);
-          importResults.push({ label: dvs.label, status: "SKIPPED" });
-          continue;
-        }
-
-        logger.info(`  Pushing [${dvs.label}]: ${dvs.dataValues.length} values...`);
-        try {
-          const summary = await dhis2Service.pushDataValueSet({
-            dataSet: dvs.dataSet,
-            period: dvs.period,
-            dataValues: dvs.dataValues,
-          });
-
-          if (summary.status === "ERROR") {
-            logger.error(`[${dvs.label}] DHIS2 returned ERROR status`, { summary });
-          }
-
-          importResults.push({
-            label: dvs.label,
-            status: summary.status,
-            imported: summary.importCount?.imported,
-            updated: summary.importCount?.updated,
-            ignored: summary.importCount?.ignored,
-            conflicts: summary.conflicts?.length || 0,
-          });
-        } catch (err) {
-          logger.error(`[${dvs.label}] Push failed: ${err.message}`);
-          importResults.push({ label: dvs.label, status: "ERROR", error: err.message });
-        }
-      }
-
+      logger.info("Step 5/5 - Pushing to DHIS2 (one dataset at a time)...");
+      const { importResults, success } = await pushDataValueSets(dataValueSets);
       result.steps.push = importResults;
-      result.success = importResults.every(
-        (r) => r.status === "SUCCESS" || r.status === "WARNING" || r.status === "SKIPPED"
-      );
+      result.success = success;
     }
   } catch (err) {
     // If iHRIS returned 401, invalidate the session so next run re-authenticates
     if (err.response?.status === 401 || err.message?.includes("401")) {
-      logger.warn("iHRIS returned 401 — invalidating session for next run");
+      logger.warn("iHRIS returned 401 - invalidating session for next run");
       ihrisService.invalidateSession();
     }
-    logger.error("Sync failed", { error: err.message, stack: err.stack });
+    logger.error("Sync failed", { error: err.message });
     result.error = err.message;
     result.success = false;
   }
@@ -272,8 +272,48 @@ async function runSync(period, dryRun = false, lastUpdated = null) {
   result.completedAt = new Date().toISOString();
   result.durationSeconds = ((Date.now() - startTime) / 1000).toFixed(1);
 
-  logger.info(`Sync ${result.success ? "COMPLETED ✓" : "FAILED ✗"} in ${result.durationSeconds}s`);
+  logger.info(`Sync ${result.success ? "completed" : "failed"} in ${result.durationSeconds}s`);
   return result;
 }
 
-module.exports = { runSync };
+/**
+ * Push the payload from the most recent dry run for `period` without
+ * re-extracting from iHRIS. Returns null if no matching dry run is pending.
+ */
+async function pushPendingDryRun(period) {
+  if (!pendingDryRun || pendingDryRun.period !== period) return null;
+  const { dataValueSets, result: preview } = pendingDryRun;
+  pendingDryRun = null;
+
+  const startTime = Date.now();
+  logger.info(`Pushing approved dry-run payload: period=${period}`);
+
+  const result = {
+    ...preview,
+    dryRun: false,
+    startedAt: new Date().toISOString(),
+    steps: { ...preview.steps },
+    success: false,
+    error: null,
+  };
+
+  try {
+    const { importResults, success } = await pushDataValueSets(dataValueSets);
+    result.steps.push = importResults;
+    result.success = success;
+  } catch (err) {
+    logger.error("Push failed", { error: err.message });
+    result.error = err.message;
+  }
+
+  result.completedAt = new Date().toISOString();
+  result.durationSeconds = ((Date.now() - startTime) / 1000).toFixed(1);
+  logger.info(`Push ${result.success ? "completed" : "failed"} in ${result.durationSeconds}s`);
+  return result;
+}
+
+function hasPendingDryRun(period) {
+  return !!pendingDryRun && pendingDryRun.period === period;
+}
+
+module.exports = { runSync, pushPendingDryRun, hasPendingDryRun };

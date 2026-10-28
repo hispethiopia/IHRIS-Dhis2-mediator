@@ -60,50 +60,58 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background: var(--bg);
-      background-image:
-        radial-gradient(ellipse at 15% 85%, rgba(44, 102, 147, 0.10) 0%, transparent 45%),
-        radial-gradient(ellipse at 85% 15%, rgba(44, 102, 147, 0.07) 0%, transparent 45%);
+      padding: 48px 16px;
+      background: var(--surface);
     }
 
-    .login-card {
-      width: 450px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-left: 4px solid var(--accent);
-      border-radius: 10px 10px 10px 10px;
-      padding: 48px 40px;
-      box-shadow: 0 4px 32px rgba(0, 0, 0, 0.07);
+    .login-form {
+      width: 100%;
+      max-width: 360px;
     }
 
     .login-logo {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 28px;
-      padding-bottom: 20px;
-    }
-
-    .login-logo img {
-      width: 170px;
+      display: block;
+      width: 230px;
+      max-width: 70%;
       height: auto;
+      margin: 0 auto 40px;
     }
 
     .login-title {
-      justify-self: center;
-      font-family: var(--serif);
-      font-size: 24px;
+      text-align: center;
+      font-size: 22px;
       font-weight: 600;
-      margin-bottom: 8px;
       color: var(--text);
+      margin-bottom: 6px;
     }
 
     .login-sub {
+      text-align: center;
+      font-size: 14px;
       color: var(--muted);
-      font-size: 13px;
-      margin-bottom: 32px;
-      line-height: 1.6;
+      margin-bottom: 28px;
+    }
+
+    #login-screen .field {
+      margin-bottom: 14px;
+    }
+
+    #login-screen .field label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    #login-screen .field input {
+      background: var(--surface);
+      padding: 9px 12px;
+    }
+
+    #login-screen .btn-primary {
+      margin-top: 2px;
+      padding: 10px;
     }
 
     .field {
@@ -264,19 +272,6 @@
       display: flex;
       align-items: center;
       gap: 10px;
-    }
-
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--green);
-      box-shadow: 0 0 6px var(--green);
-    }
-
-    .status-dot.offline {
-      background: var(--red);
-      box-shadow: 0 0 6px var(--red);
     }
 
     nav {
@@ -971,45 +966,6 @@
       flex-wrap: wrap;
     }
 
-    /* ── VERIFY ── */
-    .verify-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      padding: 3px 10px;
-      border-radius: 5px;
-      font-size: 11px;
-      font-weight: 500;
-      font-family: var(--mono);
-    }
-
-    .verify-badge.match {
-      background: rgba(26, 122, 60, 0.12);
-      color: var(--green);
-    }
-
-    .verify-badge.mismatch {
-      background: rgba(161, 98, 7, 0.12);
-      color: var(--yellow);
-    }
-
-    .verify-badge.missing {
-      background: rgba(185, 28, 28, 0.12);
-      color: var(--red);
-    }
-
-    html[data-theme="dark"] .verify-badge.match {
-      background: rgba(74, 222, 128, 0.10);
-    }
-
-    html[data-theme="dark"] .verify-badge.mismatch {
-      background: rgba(252, 211, 77, 0.10);
-    }
-
-    html[data-theme="dark"] .verify-badge.missing {
-      background: rgba(248, 113, 113, 0.10);
-    }
-
     /* ── LOGS PAGE ── */
     #page-logs {
       display: none;
@@ -1197,19 +1153,17 @@
 
   <!-- ══ LOGIN ════════════════════════════════════════════════════════════════ -->
   <div id="login-screen">
-    <div class="login-card">
-      <div class="login-logo">
-        <img src="/moh-logo.png" alt="Ministry of Health, Ethiopia" />
-      </div>
-      <div class="login-title">IHRIS to DHIS2 mediator</div>
-      <!-- <div class="login-sub">iHRIS → DHIS2 Sync Dashboard</div> -->
+    <div class="login-form">
+      <img class="login-logo" src="/moh-logo.png" alt="Ministry of Health, Ethiopia" />
+      <div class="login-title">HRA Sync</div>
+      <div class="login-sub">Sign in with your iHRIS account</div>
       <div class="field">
-        <label>Username</label>
-        <input type="text" id="login-user" placeholder="admin@ihris.org" autocomplete="username" />
+        <label for="login-user">Username</label>
+        <input type="text" id="login-user" autocomplete="username" />
       </div>
       <div class="field">
-        <label>Password</label>
-        <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password" />
+        <label for="login-pass">Password</label>
+        <input type="password" id="login-pass" autocomplete="current-password" />
       </div>
       <button class="btn btn-primary" id="login-btn" onclick="doLogin()">Sign in</button>
       <div class="error-msg" id="login-error"></div>
@@ -1227,7 +1181,7 @@
       </div>
       <div class="header-right">
         <button class="btn btn-outline" id="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode"
-          style="padding:6px 10px;line-height:1;border-radius:6px"></button>
+          style="padding:6px 12px;font-size:12px"></button>
         <button class="btn btn-outline" style="padding:6px 12px;font-size:12px" onclick="doLogout()">Sign out</button>
       </div>
     </header>
@@ -1235,7 +1189,6 @@
     <nav>
       <button class="nav-tab active" onclick="showPage('dashboard')">Dashboard</button>
       <button class="nav-tab" onclick="showPage('preview')">Data Preview</button>
-      <button class="nav-tab" onclick="showPage('verify')">Verify in DHIS2</button>
       <button class="nav-tab" onclick="showPage('history')">Sync History</button>
       <button class="nav-tab" onclick="showPage('logs')" id="nav-logs">Logs</button>
     </nav>
@@ -1336,7 +1289,6 @@
         </div>
         <div id="last-sync-panel">
           <div class="empty">
-            <div class="empty-icon">⏳</div>
             <div class="empty-title">No sync yet</div>
             <div class="empty-sub">Run a sync above to get started</div>
           </div>
@@ -1355,43 +1307,16 @@
               <input type="text" id="preview-period-input" placeholder="e.g. 2018 E.C"
                 style="width:130px;background:var(--bg);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:13px;padding:8px 10px;outline:none" />
             </div>
-            <button class="btn btn-outline" style="font-size:12px;padding:6px 12px" onclick="runDryRun()">
-              ▶ Fetch Preview
+            <button class="btn btn-outline" id="preview-btn" style="font-size:12px;padding:6px 12px" onclick="runDryRun()">
+              Fetch Preview
             </button>
           </div>
         </div>
 
         <div id="preview-content">
           <div class="empty">
-            <div class="empty-icon">🔍</div>
             <div class="empty-title">No preview loaded</div>
             <div class="empty-sub">Click "Fetch Preview" to load a dry-run of the current period</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ── VERIFY ── -->
-      <div class="page" id="page-verify">
-        <div class="section-header">
-          <div>
-            <div class="section-title">Verify in DHIS2</div>
-            <div class="section-sub">Query DHIS2 directly to confirm pushed data values are stored</div>
-          </div>
-          <div style="display:flex;gap:8px;align-items:center">
-            <div class="period-input" style="margin:0">
-              <input type="text" id="verify-period-input" placeholder="e.g. 2018 E.C"
-                style="width:120px;background:var(--bg);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:13px;padding:8px 10px;outline:none" />
-            </div>
-            <button class="btn btn-outline" style="font-size:12px;padding:6px 14px" onclick="runVerify()">
-              ▶ Query DHIS2
-            </button>
-          </div>
-        </div>
-        <div id="verify-content">
-          <div class="empty">
-            <div class="empty-icon">🔎</div>
-            <div class="empty-title">Not verified yet</div>
-            <div class="empty-sub">Enter the period you pushed and click Query DHIS2</div>
           </div>
         </div>
       </div>
@@ -1407,7 +1332,6 @@
         </div>
         <div id="history-content">
           <div class="empty">
-            <div class="empty-icon">📋</div>
             <div class="empty-title">No history yet</div>
             <div class="empty-sub">Completed syncs will appear here</div>
           </div>
@@ -1445,8 +1369,8 @@
       — period <strong id="approval-period">—</strong>
     </div>
     <div class="approval-actions">
-      <button class="btn btn-outline" onclick="rejectSync()">✕ Reject</button>
-      <button class="btn btn-green" onclick="approveSync()">✓ Approve &amp; Push</button>
+      <button class="btn btn-outline" onclick="rejectSync()">Reject</button>
+      <button class="btn btn-green" onclick="approveSync()">Approve &amp; Push</button>
     </div>
   </div>
 
@@ -1454,6 +1378,7 @@
     // ── STATE ────────────────────────────────────────────────────────────────────
     let currentUser = null;
     let pendingPayload = null; // dry-run result waiting for approval
+    let lastPreview = null;    // most recent sync result (dry run or push), reused by the Data Preview tab
     let syncHistory = [];
     let _localSyncRunning = false;   // true while runSync() is executing
     let _externalSyncDetected = false;
@@ -1493,7 +1418,6 @@
         const defaultPeriod = getCurrentQuarter();
         document.getElementById('period-input').value = defaultPeriod;
         document.getElementById('preview-period-input').value = defaultPeriod;
-        document.getElementById('verify-period-input').value = defaultPeriod;
         loadStatus();
         startDashboardPoller();
       } catch (e) {
@@ -1514,6 +1438,7 @@
       try { await fetch('/auth/logout', { method: 'POST', credentials: 'include' }); } catch { }
       currentUser = null;
       pendingPayload = null;
+      lastPreview = null;
       document.getElementById('app').style.display = 'none';
       document.getElementById('login-screen').style.display = 'flex';
       document.getElementById('login-pass').value = '';
@@ -1535,20 +1460,8 @@
       try {
         const res = await fetch('/health');
         const data = await res.json();
-        const dot = document.getElementById('status-dot');
-        const lbl = document.getElementById('status-label');
-        if (data.status === 'up') {
-          dot.className = 'status-dot';
-          lbl.textContent = 'Connected';
-        } else {
-          dot.className = 'status-dot offline';
-          lbl.textContent = 'Offline';
-        }
         if (data.lastSync) renderLastSync(data.lastSync);
-      } catch {
-        document.getElementById('status-dot').className = 'status-dot offline';
-        document.getElementById('status-label').textContent = 'Offline';
-      }
+      } catch {}
     }
 
     // ── DEBUG STATS (populated from sync results, not a separate API call) ────────
@@ -1604,15 +1517,10 @@
       if (dryRun) {
         setStep('push', 'done');
         document.getElementById('step-push-label').textContent = 'Push skipped (dry run)';
-        if (totalValues > 0) {
-          const period = data.period;
-          pendingPayload = { period, data };
-          document.getElementById('approval-count').textContent = totalValues + ' data values';
-          document.getElementById('approval-period').textContent = period;
-          document.getElementById('approval-bar').classList.add('visible');
-        }
+        showPreviewResult(data);
       } else {
         setStep('push', data.success ? 'done' : 'error');
+        showPreviewResult(data);
       }
 
       renderSyncResult(data, dryRun);
@@ -1677,11 +1585,33 @@
       }
     }
 
-    async function runDryRun() {
+    // Cache a sync result and render it in the Data Preview tab.
+    // Only an unpushed dry run gets the approval bar.
+    function showPreviewResult(data) {
+      if (!data.cadreSummary) return; // failed before transform - nothing to preview
+      lastPreview = data;
+      renderPreview(data, data.period);
+      const totalValues = Object.values(data.datasets || {}).reduce((s, d) => s + d.dataValues, 0);
+      if (data.dryRun && totalValues > 0) {
+        pendingPayload = { period: data.period, data };
+        document.getElementById('approval-count').textContent = totalValues + ' data values';
+        document.getElementById('approval-period').textContent = data.period;
+        document.getElementById('approval-bar').classList.add('visible');
+      }
+    }
+
+    // Reuses the last sync result for the same period; pass force=true to re-run.
+    async function runDryRun(force = false) {
       const previewInput = document.getElementById('preview-period-input');
       const period = toApiPeriod(previewInput.value.trim() || document.getElementById('period-input').value.trim() || getCurrentQuarter());
       previewInput.value = period;
-      const btn = event.target;
+
+      if (!force && lastPreview && lastPreview.period === period) {
+        showPreviewResult(lastPreview);
+        return;
+      }
+
+      const btn = document.getElementById('preview-btn');
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner"></span> Loading…';
 
@@ -1691,25 +1621,17 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ period, dryRun: true }),
         });
-        if (!res) { btn.disabled = false; btn.innerHTML = '▶ Fetch Preview'; return; }
+        if (!res) { btn.disabled = false; btn.innerHTML = 'Fetch Preview'; return; }
 
         await pollUntilDone((data) => {
-          if (!data) return;
-          renderPreview(data, data.period);
-          pendingPayload = { period: data.period, data };
-          const totalValues = Object.values(data.datasets || {}).reduce((s, d) => s + d.dataValues, 0);
-          if (totalValues > 0) {
-            document.getElementById('approval-count').textContent = totalValues + ' data values';
-            document.getElementById('approval-period').textContent = data.period;
-            document.getElementById('approval-bar').classList.add('visible');
-          }
+          if (data) showPreviewResult(data);
         });
       } catch (e) {
         document.getElementById('preview-content').innerHTML =
           `<div style="color:var(--red);padding:20px">Error: ${e.message}</div>`;
       } finally {
         btn.disabled = false;
-        btn.innerHTML = '▶ Fetch Preview';
+        btn.innerHTML = 'Fetch Preview';
       }
     }
 
@@ -1723,28 +1645,39 @@
       btn.innerHTML = '<span class="spinner"></span> Pushing…';
 
       try {
-        const res = await apiFetch('/sync-hrh', {
+        // Push the payload the dry run already built; if the server no longer
+        // holds it (e.g. after a restart), fall back to a full sync.
+        let res = await apiFetch('/sync-hrh/approve', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ period, dryRun: false }),
+          body: JSON.stringify({ period }),
         });
-        if (!res) { btn.disabled = false; btn.textContent = '✓ Approve & Push'; return; }
+        if (res && res.status === 404) {
+          res = await apiFetch('/sync-hrh', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ period, dryRun: false }),
+          });
+        }
+        if (!res) { btn.disabled = false; btn.textContent = 'Approve & Push'; return; }
+        if (res.status === 409) throw new Error('A sync is already in progress, please wait.');
 
         pendingPayload = null;
         document.getElementById('approval-bar').classList.remove('visible');
 
         await pollUntilDone((data) => {
           if (!data) return;
+          showPreviewResult(data);
           showPage('dashboard');
           renderSyncResult(data, false);
           loadStatus();
-          alert(data.success ? '✓ Data pushed to DHIS2 successfully' : '✗ Push completed with errors — check sync history');
+          alert(data.success ? 'Data pushed to DHIS2 successfully' : 'Push completed with errors — check sync history');
         });
       } catch (e) {
         alert('Error: ' + e.message);
       } finally {
         btn.disabled = false;
-        btn.textContent = '✓ Approve & Push';
+        btn.textContent = 'Approve & Push';
       }
     }
 
@@ -1760,7 +1693,6 @@
 
       const totalValues = Object.values(data.datasets || {}).reduce((s, d) => s + d.dataValues, 0);
       const color = data.success ? 'var(--green)' : 'var(--red)';
-      const icon = data.success ? '✓' : '✗';
 
       const dsRows = Object.entries(data.datasets || {}).map(([label, ds]) => `
     <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px">
@@ -1775,7 +1707,6 @@
       el.innerHTML = `
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px;margin-top:4px;box-shadow:0 1px 4px rgba(0,0,0,0.04)">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-        <span style="color:${color};font-size:16px">${icon}</span>
         <span style="font-weight:600">${dryRun ? 'Dry run complete' : (data.success ? 'Sync complete' : 'Sync failed')}</span>
         <span style="color:var(--muted);font-size:12px;margin-left:auto;font-family:var(--mono)">${data.durationSeconds}s · ${data.period}</span>
       </div>
@@ -1794,7 +1725,7 @@
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div>
-          <span style="font-size:13px;font-weight:600;color:${color}">${sync.success ? '✓ Success' : '✗ Failed'}</span>
+          <span style="font-size:13px;font-weight:600;color:${color}">${sync.success ? 'Success' : 'Failed'}</span>
           <span style="font-family:var(--mono);font-size:13px;color:var(--muted);margin-left:12px">${sync.period}</span>
         </div>
         <span style="font-size:12px;color:var(--muted)">${sync.completedAt ? new Date(sync.completedAt).toLocaleString() : ''}</span>
@@ -1808,7 +1739,7 @@
       const datasets = data.datasets || {};
 
       if (Object.values(datasets).every(d => d.dataValues === 0)) {
-        el.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-title">No data values generated</div><div class="empty-sub">Check org unit mapping and iHRIS data</div></div>`;
+        el.innerHTML = `<div class="empty"><div class="empty-title">No data values generated</div><div class="empty-sub">Check org unit mapping and iHRIS data</div></div>`;
         return;
       }
 
@@ -1833,7 +1764,8 @@
       el.innerHTML = `
     <div class="card">
       <div class="section-header" style="margin-bottom:14px">
-        <div><div class="section-title">Sync Preview — ${period}</div><div class="section-sub">Review before pushing to DHIS2</div></div>
+        <div><div class="section-title">Sync Preview — ${period}</div><div class="section-sub">Generated ${data.completedAt ? new Date(data.completedAt).toLocaleString() : ''} · ${data.dryRun ? 'review before pushing to DHIS2' : 'already pushed to DHIS2'}</div></div>
+        <button class="btn btn-outline" style="font-size:12px;padding:6px 12px" onclick="runDryRun(true)">Re-run</button>
       </div>
       <div class="ds-tabs">${tabHtml}</div>
       ${tabContent}
@@ -1859,7 +1791,7 @@
         if (!res) return;
         const history = await res.json();
         if (!Array.isArray(history) || history.length === 0) {
-          el.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">No history yet</div><div class="empty-sub">Completed syncs will appear here</div></div>`;
+          el.innerHTML = `<div class="empty"><div class="empty-title">No history yet</div><div class="empty-sub">Completed syncs will appear here</div></div>`;
           return;
         }
         el.innerHTML = `
@@ -1906,7 +1838,6 @@
     function setStep(name, state) {
       const el = document.getElementById('step-' + name + '-icon');
       el.className = 'step-icon ' + state;
-      el.textContent = state === 'done' ? '✓' : state === 'error' ? '✗' : state === 'running' ? '…' : el.textContent;
 
       // Update the connector leading into this step
       const prevMap = { orgunits: 'validate', extract: 'orgunits', transform: 'extract', push: 'transform' };
@@ -1969,7 +1900,7 @@
       const row = btn.closest('tr').nextElementSibling;
       if (!row) return;
       const isOpen = row.classList.toggle('open');
-      btn.textContent = isOpen ? '▲ collapse' : '▶ expand';
+      btn.textContent = isOpen ? 'collapse' : 'expand';
     }
 
     function renderDataTables(data) {
@@ -2022,7 +1953,7 @@
             <td class="mono" style="color:var(--muted);font-size:11px">${el.deUid}</td>
             <td class="num">${n(el.total)}</td>
             <td class="num">${el.orgUnitCount}</td>
-            <td><button class="de-expand-btn" onclick="toggleDeDetail(this)">▶ expand</button></td>
+            <td><button class="de-expand-btn" onclick="toggleDeDetail(this)">expand</button></td>
           </tr>
           <tr class="de-detail-row">
             <td colspan="5" style="padding:4px 12px 10px">
@@ -2117,209 +2048,6 @@
       });
     }
 
-    // ── VERIFY ────────────────────────────────────────────────────────────────────
-    async function runVerify() {
-      const periodInput = document.getElementById('verify-period-input');
-      const period = toApiPeriod(periodInput.value.trim() || getCurrentQuarter());
-      periodInput.value = period;
-
-      const btn = event.target;
-      btn.disabled = true;
-      btn.innerHTML = '<span class="spinner"></span> Querying…';
-      document.getElementById('verify-content').innerHTML =
-        '<div style="padding:20px;color:var(--muted)">Fetching from DHIS2…</div>';
-
-      try {
-        const res = await apiFetch(`/verify?period=${encodeURIComponent(period)}`);
-        if (!res) { btn.disabled = false; btn.innerHTML = '▶ Query DHIS2'; return; }
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Verify failed');
-        renderVerify(data);
-      } catch (e) {
-        document.getElementById('verify-content').innerHTML =
-          `<div style="color:var(--red);padding:20px">Error: ${e.message}</div>`;
-      } finally {
-        btn.disabled = false;
-        btn.innerHTML = '▶ Query DHIS2';
-      }
-    }
-
-    function renderVerify(data) {
-      const el = document.getElementById('verify-content');
-      const n = v => Number(v || 0).toLocaleString();
-
-      const deNameFmt = key => {
-        const parts = key.replace(/^DE_/, '').split('_');
-        const statusKw = ['END', 'OF', 'YEAR', 'LEAVING', 'RECRUITED', 'BEGINNING'];
-        const splitIdx = parts.findIndex(p => statusKw.includes(p));
-        if (splitIdx > 0) {
-          const cadre = parts.slice(0, splitIdx).map(w => w[0] + w.slice(1).toLowerCase()).join(' ');
-          const status = parts.slice(splitIdx).map(w => w[0] + w.slice(1).toLowerCase()).join(' ');
-          return `${cadre} — ${status}`;
-        }
-        return parts.map(w => w[0] + w.slice(1).toLowerCase()).join(' ');
-      };
-
-      // Summary cards
-      const totalValues = data.datasets.reduce((s, ds) => s + (ds.totalValues || 0), 0);
-      const totalOrgUnits = new Set(
-        data.datasets.flatMap(ds => (ds.dataValues || []).map(dv => dv.orgUnit))
-      ).size;
-
-      const summaryCards = `
-    <div class="grid-3" style="margin-bottom:20px">
-      <div class="card">
-        <div class="card-title">Verified At</div>
-        <div class="card-value" style="font-size:16px">${new Date(data.verifiedAt).toLocaleTimeString()}</div>
-        <div class="card-sub">${new Date(data.verifiedAt).toLocaleDateString()}</div>
-      </div>
-      <div class="card">
-        <div class="card-title">Stored Values</div>
-        <div class="card-value" style="color:var(--green)">${n(totalValues)}</div>
-        <div class="card-sub">Data values in DHIS2 for ${data.period}</div>
-      </div>
-      <div class="card">
-        <div class="card-title">Org Units</div>
-        <div class="card-value">${totalOrgUnits}</div>
-        <div class="card-sub">Facilities with stored data</div>
-      </div>
-    </div>`;
-
-      // Per-dataset tabs
-      const dsKeys = data.datasets;
-      const tabHtml = dsKeys.map((ds, i) => `
-    <button class="ds-tab ${i === 0 ? 'active' : ''}" onclick="switchVerifyTab(this,${i})">
-      ${ds.label}
-      <span class="badge ${ds.totalValues > 0 ? 'badge-green' : 'badge-red'}" style="margin-left:6px">${ds.totalValues || 0}</span>
-    </button>`).join('');
-
-      const tabContent = dsKeys.map((ds, i) => {
-        if (ds.error) {
-          return `<div data-vtab="${i}" style="display:${i === 0 ? 'block' : 'none'}">
-        <div style="color:var(--red);padding:16px">Error: ${ds.error}</div>
-      </div>`;
-        }
-        if (!ds.dataValues || ds.dataValues.length === 0) {
-          return `<div data-vtab="${i}" style="display:${i === 0 ? 'block' : 'none'}">
-        <div class="empty" style="padding:40px">
-          <div class="empty-icon">⚠️</div>
-          <div class="empty-title">No data found in DHIS2</div>
-          <div class="empty-sub">Dataset: <span class="mono">${ds.uid}</span> &nbsp;·&nbsp; Period: ${ds.period}</div>
-        </div>
-      </div>`;
-        }
-
-        // Group by org unit for a structured view
-        const byOU = {};
-        for (const dv of ds.dataValues) {
-          const key = dv.orgUnit;
-          if (!byOU[key]) byOU[key] = { name: dv.orgUnitName, uid: dv.orgUnit, values: [] };
-          byOU[key].values.push(dv);
-        }
-
-        const allOU = Object.values(byOU).sort((a, b) => a.name.localeCompare(b.name));
-        const PAGE = 200;
-        const displayOU = allOU.slice(0, PAGE);
-        const truncated = allOU.length > PAGE;
-
-        const ouRows = displayOU.map(ou => {
-          const subRows = ou.values.map(dv => `
-        <tr style="background:rgba(0,0,0,0.03)">
-          <td style="padding-left:28px;font-size:12px;color:var(--muted)">${deNameFmt(dv.dataElementName)}</td>
-          <td class="mono" style="font-size:11px;color:var(--muted)">${dv.dataElement}</td>
-          <td class="num" style="font-weight:600;color:var(--accent)">${n(dv.value)}</td>
-          <td style="font-size:11px;color:var(--muted)">${dv.lastUpdated ? new Date(dv.lastUpdated).toLocaleString() : '—'}</td>
-          <td style="font-size:11px;color:var(--muted)">${dv.storedBy || '—'}</td>
-        </tr>`).join('');
-          return `
-        <tr style="cursor:pointer" onclick="toggleOuGroup(this)">
-          <td style="font-weight:500">▶ ${ou.name}</td>
-          <td class="mono" style="font-size:11px;color:var(--muted)">${ou.uid}</td>
-          <td class="num"><span class="badge badge-blue">${ou.values.length} values</span></td>
-          <td colspan="2"></td>
-        </tr>
-        <tr class="ou-sub-rows" style="display:none"><td colspan="5" style="padding:0">
-          <table style="width:100%">${subRows}</table>
-        </td></tr>`;
-        }).join('');
-
-        const truncNote = truncated
-          ? `<div style="padding:10px 14px;background:var(--bg);border-top:1px solid var(--border);font-size:12px;color:var(--yellow)">
-               Showing first ${PAGE} of ${allOU.length} org units — use the filter to search for specific facilities.
-             </div>`
-          : '';
-
-        return `<div data-vtab="${i}" style="display:${i === 0 ? 'block' : 'none'}">
-      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">
-        Dataset UID: <span class="mono">${ds.uid}</span> &nbsp;·&nbsp; Period: <span class="mono">${ds.period}</span> &nbsp;·&nbsp; ${ds.totalValues} values across ${Object.keys(byOU).length} org units
-      </div>
-      <input class="filter-input" placeholder="Filter org units…" oninput="filterVerifyTable(this)" />
-      <div class="ou-scroll">
-        <table>
-          <thead><tr>
-            <th>Org Unit</th>
-            <th>DHIS2 UID</th>
-            <th class="num">Values</th>
-            <th>Last Updated</th>
-            <th>Stored By</th>
-          </tr></thead>
-          <tbody>${ouRows}</tbody>
-        </table>
-      </div>
-      ${truncNote}
-    </div>`;
-      }).join('');
-
-      el.innerHTML = `
-    ${summaryCards}
-    <div class="card">
-      <div class="section-header" style="margin-bottom:14px">
-        <div><div class="section-title">Stored Data Values — ${data.period}</div></div>
-      </div>
-      <div class="ds-tabs">${tabHtml}</div>
-      ${tabContent}
-    </div>`;
-    }
-
-    function switchVerifyTab(btn, idx) {
-      const card = btn.closest('.card');
-      card.querySelectorAll(':scope > .ds-tabs > .ds-tab').forEach(t => t.classList.remove('active'));
-      btn.classList.add('active');
-      card.querySelectorAll('[data-vtab]').forEach(d => d.style.display = 'none');
-      const el = card.querySelector(`[data-vtab="${idx}"]`);
-      if (el) el.style.display = 'block';
-    }
-
-    function toggleOuGroup(row) {
-      const subRow = row.nextElementSibling;
-      if (!subRow) return;
-      const open = subRow.style.display !== 'none';
-      subRow.style.display = open ? 'none' : '';
-      const arrow = row.cells[0];
-      if (arrow) arrow.innerHTML = arrow.innerHTML.replace(open ? '▼' : '▶', open ? '▶' : '▼');
-    }
-
-    function filterVerifyTable(input) {
-      const term = input.value.toLowerCase();
-      const tbody = input.closest('[data-vtab]').querySelector('tbody');
-      if (!tbody) return;
-      const rows = [...tbody.querySelectorAll('tr')];
-      let i = 0;
-      while (i < rows.length) {
-        const row = rows[i];
-        if (row.classList.contains('ou-sub-rows')) { i++; continue; }
-        const text = (row.cells[0]?.textContent || '').toLowerCase();
-        const match = text.includes(term);
-        row.style.display = match ? '' : 'none';
-        // also hide the sub-rows of hidden parent
-        if (rows[i + 1]?.classList.contains('ou-sub-rows')) {
-          rows[i + 1].style.display = match ? rows[i + 1].style.display : 'none';
-          i++;
-        }
-        i++;
-      }
-    }
-
     // Auto-check health on load
     loadStatus();
 
@@ -2385,6 +2113,11 @@
             if (s.lastSync) {
               renderLastSync(s.lastSync);
               updateStatsFromSync(s.lastSync);
+              // Seed the preview from a sync that finished before this page loaded
+              if (!lastPreview && s.lastSync.cadreSummary) {
+                lastPreview = s.lastSync;
+                renderPreview(s.lastSync, s.lastSync.period);
+              }
             }
           }
         } catch { }
@@ -2535,8 +2268,6 @@
     }
 
     // ── THEME ─────────────────────────────────────────────────────────────────────
-    const _sunIcon = `<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`;
-    const _moonIcon = `<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
 
     function toggleTheme() {
       const html = document.documentElement;
@@ -2550,7 +2281,7 @@
       const btn = document.getElementById('theme-toggle');
       if (!btn) return;
       const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-      btn.innerHTML = isDark ? _sunIcon : _moonIcon;
+      btn.textContent = isDark ? 'Light mode' : 'Dark mode';
       btn.title = isDark ? 'Switch to light mode' : 'Switch to dark mode';
     }
 

@@ -1,5 +1,3 @@
-// src/scripts/count-nurses.js
-//
 // Count nurses at a specific iHRIS facility.
 //
 // Usage:
@@ -28,7 +26,7 @@ if (!locationId) {
   process.exit(1);
 }
 
-// ── Cadre keyword map (mirrors hrh.transform.js) ─────────────────────────────
+// Cadre keyword map (mirrors hrh.transform.js)
 const CADRE_MAP = [
   { key: "Midwives",          keywords: ["midwif"] },
   { key: "Nurses",            keywords: ["nursing", "nurse"] },
@@ -59,7 +57,7 @@ function resolveCadre(role) {
   return "Other Health";
 }
 
-// ── Auth ──────────────────────────────────────────────────────────────────────
+// Auth
 async function login() {
   const base = process.env.IHRIS_BASE_URL.replace("/fhir", "");
   const res = await axios.post(
@@ -69,12 +67,12 @@ async function login() {
   );
 
   const raw = res.headers["set-cookie"];
-  if (!raw || raw.length === 0) throw new Error("Login failed — no Set-Cookie returned. Check credentials in .env");
+  if (!raw || raw.length === 0) throw new Error("Login failed - no Set-Cookie returned. Check credentials in .env");
 
   return raw.map(c => c.split(";")[0]).join("; ");
 }
 
-// ── Fetch all pages ───────────────────────────────────────────────────────────
+// Fetch all pages
 async function fetchAllPages(client, url, params) {
   const all = [];
   let nextUrl = url;
@@ -112,7 +110,7 @@ async function fetchAllPages(client, url, params) {
   return all;
 }
 
-// ── Fetch gender for a set of practitioner IDs ───────────────────────────────
+// Fetch gender for a set of practitioner IDs
 async function fetchGenders(client, ids) {
   const map = new Map();
   const BATCH = 20;
@@ -128,7 +126,7 @@ async function fetchGenders(client, ids) {
         if (gender) map.set(p.id, gender);
       }
     } catch (err) {
-      console.warn(`  Warning: gender batch failed — ${err.message}`);
+      console.warn(`  Warning: gender batch failed - ${err.message}`);
     }
   }
 
@@ -156,12 +154,12 @@ function extractGender(p) {
   return null;
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────────
+// Main
 (async () => {
   console.log(`\niHRIS Nurse Count`);
   console.log(`Facility : ${locationId}`);
   console.log(`Mode     : ${inactive ? "active + inactive" : "active only"}`);
-  console.log("─".repeat(50));
+  console.log("-".repeat(50));
 
   console.log("Logging in to iHRIS...");
   const cookie = await login();
@@ -198,7 +196,7 @@ function extractGender(p) {
   const genderMap = await fetchGenders(client, practIds);
   console.log();
 
-  // Count by cadre × gender
+  // Count by cadre x gender
   const counts = {};
   for (const { key } of CADRE_MAP) counts[key] = { male: 0, female: 0, unknown: 0 };
 
@@ -209,14 +207,14 @@ function extractGender(p) {
     counts[cadre][gender]++;
   }
 
-  // ── Print role list ─────────────────────────────────────────────────────────
+  // Print role list
   const displayRoles = allCadres ? roles : roles.filter(r => resolveCadre(r) === "Nurses");
   console.log(`\nPractitionerRoles fetched (${displayRoles.length}):`);
-  console.log("─".repeat(120));
+  console.log("-".repeat(120));
   console.log(
     `  ${"#".padEnd(4)} ${"Role ID".padEnd(36)} ${"Practitioner ID".padEnd(36)} ${"Role Name".padEnd(28)} ${"Cadre".padEnd(20)} ${"Gender".padEnd(8)} Active`
   );
-  console.log("─".repeat(120));
+  console.log("-".repeat(120));
   displayRoles.forEach((role, i) => {
     const practId = role.practitioner?.reference?.split("/").pop() || "(none)";
     const cadre   = resolveCadre(role);
@@ -227,7 +225,7 @@ function extractGender(p) {
       `  ${String(i + 1).padEnd(4)} ${(role.id || "(no id)").padEnd(36)} ${practId.padEnd(36)} ${name.padEnd(28)} ${cadre.padEnd(20)} ${gender.padEnd(8)} ${active}`
     );
   });
-  console.log("─".repeat(120));
+  console.log("-".repeat(120));
   console.log();
 
   const pad = (s, n) => String(s).padEnd(n);
@@ -236,20 +234,20 @@ function extractGender(p) {
   if (allCadres) {
     console.log("Staff by cadre (gender-disaggregated):");
     console.log(header);
-    console.log("  " + "─".repeat(52));
+    console.log("  " + "-".repeat(52));
     let totM = 0, totF = 0, totU = 0;
     for (const { key } of CADRE_MAP) {
       const { male: m, female: f, unknown: u } = counts[key];
       totM += m; totF += f; totU += u;
       console.log(`  ${pad(key, 20)} ${String(m).padStart(6)}  ${String(f).padStart(6)}  ${String(u).padStart(7)}  ${String(m + f + u).padStart(6)}`);
     }
-    console.log("  " + "─".repeat(52));
+    console.log("  " + "-".repeat(52));
     console.log(`  ${pad("TOTAL", 20)} ${String(totM).padStart(6)}  ${String(totF).padStart(6)}  ${String(totU).padStart(7)}  ${String(roles.length).padStart(6)}`);
   } else {
     const { male: m, female: f, unknown: u } = counts["Nurses"];
     console.log("Nurses at this facility (gender-disaggregated):");
     console.log(header);
-    console.log("  " + "─".repeat(52));
+    console.log("  " + "-".repeat(52));
     console.log(`  ${pad("Nurses", 20)} ${String(m).padStart(6)}  ${String(f).padStart(6)}  ${String(u).padStart(7)}  ${String(m + f + u).padStart(6)}`);
   }
 })().catch(err => {

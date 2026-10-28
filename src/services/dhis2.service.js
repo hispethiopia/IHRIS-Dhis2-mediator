@@ -1,4 +1,3 @@
-// src/services/dhis2.service.js
 const axios = require("axios");
 const logger = require("../logger");
 
@@ -25,8 +24,8 @@ async function pushDataValueSet(dataValueSet) {
   const valueCount = dataValueSet.dataValues?.length || 0;
   logger.info(`Submitting ${valueCount} data values to DHIS2 (async import)...`);
 
-  // Submit with async=true — DHIS2 accepts the payload and returns a task ID immediately
-  // instead of holding the connection open for the entire import (which times out on large sets).
+  // async=true: DHIS2 returns a task ID immediately instead of holding the
+  // connection open for the whole import, which times out on large payloads.
   let taskId;
   let rawResponse;
   try {
@@ -52,21 +51,17 @@ async function pushDataValueSet(dataValueSet) {
     );
   }
 
-  logger.info(`DHIS2 import task started (ID: ${taskId}) — polling for completion...`);
+  logger.info(`DHIS2 import task started (ID: ${taskId}) - polling for completion...`);
 
   // Poll the task every 5 seconds; give up after DHIS2_TASK_TIMEOUT_MS (default 60 min).
-  // With parallel dataset submission, tasks queue up in DHIS2 and the last one may not
-  // start processing until 30+ minutes after submission — 20 min was too short.
-  //
-  // Empty-response detection: DHIS2 returns [] for unknown task IDs (e.g. after a restart
-  // wipes in-memory tasks). We fail fast instead of spinning for the full timeout.
+  // DHIS2 returns [] for unknown task IDs (e.g. after a restart wipes in-memory
+  // tasks), so repeated empty responses fail fast instead of waiting out the timeout.
   const POLL_MS  = 5000;
   const MAX_WAIT = parseInt(process.env.DHIS2_TASK_TIMEOUT_MS || String(60 * 60 * 1000), 10);
   const deadline = Date.now() + MAX_WAIT;
   let   done     = false;
-  // After the task has been seen at least once, 3 consecutive empty polls (15 s) means
-  // DHIS2 restarted and dropped the task.  Before it's ever been seen we allow 5 min
-  // (60 polls) in case DHIS2 is slow to queue large payloads.
+  // Once the task has been seen, 3 consecutive empty polls (15 s) means it was lost.
+  // Before that, allow 60 polls (5 min) in case DHIS2 is slow to queue the import.
   let seenAny        = false;
   let consecutiveEmpty = 0;
   const MAX_EMPTY_AFTER_SEEN  = 3;
@@ -80,7 +75,7 @@ async function pushDataValueSet(dataValueSet) {
       const r = await client.get(`/system/tasks/DATAVALUE_IMPORT/${taskId}`, { timeout: 15000 });
       notifications = Array.isArray(r.data) ? r.data : [];
     } catch (pollErr) {
-      logger.warn(`Task poll failed (${pollErr.message}) — retrying...`);
+      logger.warn(`Task poll failed (${pollErr.message}) - retrying...`);
       continue;
     }
 
@@ -90,12 +85,12 @@ async function pushDataValueSet(dataValueSet) {
       if (consecutiveEmpty >= limit) {
         throw new Error(
           `DHIS2 task ${taskId} ${seenAny ? "disappeared" : "never appeared"} after ` +
-          `${consecutiveEmpty * POLL_MS / 1000}s of empty responses — ` +
+          `${consecutiveEmpty * POLL_MS / 1000}s of empty responses - ` +
           `DHIS2 may have restarted and lost the task. Re-run the sync.`
         );
       }
       logger.warn(
-        `  Task ${taskId}: no notifications yet (${consecutiveEmpty}/${limit}) — ` +
+        `  Task ${taskId}: no notifications yet (${consecutiveEmpty}/${limit}) - ` +
         (seenAny ? "task may have been lost" : "waiting for DHIS2 to start processing")
       );
       continue;
@@ -104,8 +99,8 @@ async function pushDataValueSet(dataValueSet) {
     seenAny = true;
     consecutiveEmpty = 0;
     done = notifications.some(n => n.completed === true);
-    const lastMsg = notifications.slice(-1)[0]?.message || "working…";
-    logger.info(`  Task ${taskId}: ${lastMsg}${done ? " ✓" : ""}`);
+    const lastMsg = notifications.slice(-1)[0]?.message || "working...";
+    logger.info(`  Task ${taskId}: ${lastMsg}${done ? " (done)" : ""}`);
     if (done) break;
   }
 
@@ -134,11 +129,11 @@ async function pushDataValueSet(dataValueSet) {
   return summary;
 }
 
-let _orgUnitNames    = {}; // uid → display name
-let _orgUnitDatasets = {}; // uid → facility HR dataset id
-let _orgUnitMapCache = null; // raw lookup map { code|name → uid }
+let _orgUnitNames    = {}; // uid -> display name
+let _orgUnitDatasets = {}; // uid -> facility HR dataset id
+let _orgUnitMapCache = null; // raw lookup map { code|name -> uid }
 let _orgUnitCachedAt = 0;
-const ORG_UNIT_CACHE_TTL = 30 * 60 * 1000; // 30 minutes — org unit assignments rarely change
+const ORG_UNIT_CACHE_TTL = 30 * 60 * 1000; // 30 minutes - org unit assignments rarely change
 
 /** Returns the five facility HR dataset IDs configured in .env (non-empty only). */
 function getFacilityDatasetIds() {
@@ -163,7 +158,7 @@ function getAllDatasetIds() {
 
 /**
  * Fetch org units from DHIS2.
- * Reads organisationUnits directly from each HR facility dataset — faster than
+ * Reads organisationUnits directly from each HR facility dataset - faster than
  * a filter scan across all org units, and captures facilities at any level.
  */
 async function fetchOrgUnitMap(forceRefresh = false) {
@@ -178,11 +173,9 @@ async function fetchOrgUnitMap(forceRefresh = false) {
   const dsIds = getAllDatasetIds();
   logger.info(`Fetching org units from ${dsIds.length} HR datasets (facility + admin levels)...`);
 
-  // Priority order: when an org unit appears in multiple datasets, the dataset
-  // with the lowest priority number wins. Hospital (1) beats Health Center (2),
-  // etc. This handles cases where DHIS2 has an org unit assigned to more than
-  // one HR dataset — without a defined priority, Promise.all's non-deterministic
-  // response order would assign the org unit to whichever dataset responded first.
+  // When an org unit is assigned to more than one HR dataset, the dataset with
+  // the lowest priority number wins (Hospital = 1, Health Center = 2, ...), so the
+  // result doesn't depend on which request happened to finish first.
   const DATASET_PRIORITY = {};
   const priorityList = [
     process.env.DHIS2_DATASET_HOSPITAL,
@@ -199,7 +192,7 @@ async function fetchOrgUnitMap(forceRefresh = false) {
   const map        = {};
   const nameMap    = {};
   const datasetMap = {};
-  const conflicts  = {}; // uid → [dsIds] for logging
+  const conflicts  = {}; // uid -> [dsIds] for logging
 
   // Fetch each dataset's assigned org units in parallel
   const responses = await Promise.all(
@@ -239,11 +232,11 @@ async function fetchOrgUnitMap(forceRefresh = false) {
 
   if (Object.keys(conflicts).length > 0) {
     logger.warn(
-      `${Object.keys(conflicts).length} org unit(s) are assigned to multiple HR datasets in DHIS2 — ` +
+      `${Object.keys(conflicts).length} org unit(s) are assigned to multiple HR datasets in DHIS2 - ` +
       `resolved using priority order (Hospital > Health Center > Clinic > Comp HP > Basic HP > Woreda > Zone > Region):`
     );
     for (const [uid, dsIds] of Object.entries(conflicts)) {
-      logger.warn(`  ${nameMap[uid] || uid} (${uid}): datasets [${dsIds.join(", ")}] → assigned to ${datasetMap[uid]}`);
+      logger.warn(`  ${nameMap[uid] || uid} (${uid}): datasets [${dsIds.join(", ")}] -> assigned to ${datasetMap[uid]}`);
     }
   }
 
@@ -257,21 +250,14 @@ async function fetchOrgUnitMap(forceRefresh = false) {
   return map;
 }
 
-/** Returns uid→name map populated by the most recent fetchOrgUnitMap() call. */
+/** Returns uid -> name map populated by the most recent fetchOrgUnitMap() call. */
 function getOrgUnitNames() {
   return _orgUnitNames;
 }
 
-/** Returns uid→datasetId map populated by the most recent fetchOrgUnitMap() call. */
+/** Returns uid -> datasetId map populated by the most recent fetchOrgUnitMap() call. */
 function getOrgUnitDatasets() {
   return _orgUnitDatasets;
-}
-
-/** Returns array of org unit UIDs that belong to a specific dataset. */
-function getOrgUnitsForDataset(datasetId) {
-  return Object.entries(_orgUnitDatasets)
-    .filter(([, dsId]) => dsId === datasetId)
-    .map(([uid]) => uid);
 }
 
 let _cachedCocs = null; // { male: uid, female: uid }
@@ -289,7 +275,7 @@ async function fetchGenderCategoryOptionCombos() {
   const maleCoc   = process.env.DHIS2_COC_MALE;
   const femaleCoc = process.env.DHIS2_COC_FEMALE;
   if (maleCoc && femaleCoc) {
-    logger.info(`Gender COCs from env — Male: ${maleCoc}, Female: ${femaleCoc}`);
+    logger.info(`Gender COCs from env - Male: ${maleCoc}, Female: ${femaleCoc}`);
     _cachedCocs = { male: maleCoc, female: femaleCoc };
     return _cachedCocs;
   }
@@ -321,7 +307,7 @@ async function fetchGenderCategoryOptionCombos() {
     );
   }
 
-  logger.info(`Gender COCs — Male: ${male}, Female: ${female}`);
+  logger.info(`Gender COCs - Male: ${male}, Female: ${female}`);
   _cachedCocs = { male, female };
   return _cachedCocs;
 }
@@ -332,7 +318,7 @@ async function fetchGenderCategoryOptionCombos() {
  */
 async function validateDataset(datasetId) {
   if (!datasetId || datasetId.startsWith("REPLACE_WITH")) {
-    logger.warn(`Dataset UID not configured yet: "${datasetId}" — skipping validation`);
+    logger.warn(`Dataset UID not configured yet: "${datasetId}" - skipping validation`);
     return true; // Don't block startup for unconfigured datasets
   }
 
@@ -361,88 +347,12 @@ async function validateDataset(datasetId) {
   }
 }
 
-let _rootOrgUnitId = null;
-
-/**
- * Returns the DHIS2 root (national/level-1) org unit ID.
- * Cached after first call.
- */
-async function getRootOrgUnitId() {
-  if (_rootOrgUnitId) return _rootOrgUnitId;
-  const client = getClient();
-  const res = await client.get("/organisationUnits", {
-    params: { level: 1, fields: "id", paging: false },
-  });
-  const units = res.data.organisationUnits || [];
-  if (units.length === 0) throw new Error("Could not find root org unit in DHIS2");
-  _rootOrgUnitId = units[0].id;
-  logger.info(`Root org unit: ${_rootOrgUnitId}`);
-  return _rootOrgUnitId;
-}
-
-/**
- * Fetch stored data values from DHIS2 for a given dataset + period.
- * Uses the root org unit with children=true to fetch all data in one request,
- * avoiding URL-length issues from passing thousands of org unit UIDs.
- * Returns an array of raw data value objects.
- *
- * IMPORTANT: DHIS2's /dataValueSets?dataSet=X returns values based on data element
- * membership in dataset X, NOT on which org units are assigned to X. All 5 facility
- * datasets share the same data element UIDs, so without filtering, a hospital's data
- * would appear when querying the Health Center, Basic HP, etc. datasets. We filter
- * the result to only org units that are actually assigned to the queried dataset.
- */
-async function fetchStoredDataValues(dataSetId, period, _orgUnitUids = []) {
-  const client = getClient();
-
-  // Ensure org unit map is loaded so we can filter by dataset assignment below.
-  if (!_orgUnitMapCache) {
-    await fetchOrgUnitMap();
-  }
-
-  // Use root org unit + children=true (one request, avoids URL length limits)
-  const rootOu = await getRootOrgUnitId();
-
-  const response = await client.get("/dataValueSets", {
-    params: { dataSet: dataSetId, period, orgUnit: rootOu, children: true, paging: false },
-    validateStatus: (status) => (status >= 200 && status < 300) || status === 409,
-  });
-
-  if (response.status === 409) {
-    const msg = response.data?.message || "period/dataset conflict";
-    logger.warn(`DHIS2 GET /dataValueSets returned 409 for dataset ${dataSetId} period ${period}: ${msg}`);
-    return [];
-  }
-
-  const allValues = response.data.dataValues || [];
-
-  // Filter to only org units assigned to this specific dataset.
-  // Without this, a hospital's values appear in Health Center / Health Post / Clinic
-  // queries too because those datasets contain the same data element UIDs.
-  const assignedOrgUnits = new Set(getOrgUnitsForDataset(dataSetId));
-  if (assignedOrgUnits.size === 0) {
-    // Org unit map not yet built or dataset has no org units — return unfiltered
-    return allValues;
-  }
-
-  const filtered = allValues.filter(v => assignedOrgUnits.has(v.orgUnit));
-
-  if (filtered.length !== allValues.length) {
-    logger.info(
-      `[verify] ${dataSetId}: filtered ${allValues.length} → ${filtered.length} values ` +
-      `(removed ${allValues.length - filtered.length} belonging to org units not in this dataset)`
-    );
-  }
-
-  return filtered;
-}
-
 function clearOrgUnitCache() {
   _orgUnitMapCache = null;
   _orgUnitCachedAt = 0;
   _orgUnitNames    = {};
   _orgUnitDatasets = {};
-  logger.info("Org unit cache cleared — next sync will re-fetch from DHIS2");
+  logger.info("Org unit cache cleared - next sync will re-fetch from DHIS2");
 }
 
 module.exports = {
@@ -450,11 +360,9 @@ module.exports = {
   fetchOrgUnitMap,
   getOrgUnitNames,
   getOrgUnitDatasets,
-  getOrgUnitsForDataset,
   getFacilityDatasetIds,
   getAllDatasetIds,
   validateDataset,
   fetchGenderCategoryOptionCombos,
-  fetchStoredDataValues,
   clearOrgUnitCache,
 };

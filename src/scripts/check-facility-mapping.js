@@ -1,7 +1,5 @@
-// src/scripts/check-facility-mapping.js
-//
 // For every DHIS2 org unit assigned to one of the 8 HR datasets, checks whether
-// it is mapped from the iHRIS side — either natively (iHRIS Location id is
+// it is mapped from the iHRIS side - either natively (iHRIS Location id is
 // literally "DHIS2-{uid}") or manually (via config/location-mapping.json).
 //
 // Uses the same dataset-assignment logic as the live sync (dhis2.service.js),
@@ -43,14 +41,14 @@ function esc(val) {
 
 // Parses logs/ihris-locations.log into:
 //  - nativeByUid:  Map<dhis2Uid, { ihrisId, name, inUse }>   (STATUS=DHIS2 rows)
-//  - byIhrisId:    Map<ihrisId, { name, inUse, status }>     (all rows — used to
+//  - byIhrisId:    Map<ihrisId, { name, inUse, status }>     (all rows - used to
 //                  look up display info for manually-mapped LOCAL ids)
 function parseLocationsLog() {
   const nativeByUid = new Map();
   const byIhrisId    = new Map();
 
   if (!fs.existsSync(LOCATIONS_LOG)) {
-    console.error(`${LOCATIONS_LOG} not found — run a sync or hit /debug/locations first`);
+    console.error(`${LOCATIONS_LOG} not found - run a sync or hit /debug/locations first`);
     process.exit(1);
   }
 
@@ -91,7 +89,7 @@ function parseManualMapping() {
 
 async function main() {
   if (!process.env.DHIS2_BASE_URL) {
-    console.error("DHIS2_BASE_URL not set — check .env");
+    console.error("DHIS2_BASE_URL not set - check .env");
     process.exit(1);
   }
 
@@ -157,7 +155,7 @@ async function main() {
   fs.mkdirSync(path.dirname(OUTPUT_CSV), { recursive: true });
   fs.writeFileSync(OUTPUT_CSV, csvLines.join("\n"), "utf8");
 
-  console.log(`\nWrote ${rows.length} org units → ${OUTPUT_CSV}\n`);
+  console.log(`\nWrote ${rows.length} org units -> ${path.relative(process.cwd(), OUTPUT_CSV)}\n`);
   console.log("Summary by facility type:");
   console.log("facility_type".padEnd(28), "total".padStart(8), "mapped".padStart(8), "unmapped".padStart(10));
   let grandTotal = 0, grandMapped = 0, grandUnmapped = 0;
