@@ -12,3 +12,15 @@ logs/
 
 # Local editor/tool files
 .Rhistory
+
+
+
+
+# Slides, documents and Markdown files
+*.pptx
+*.ppt
+*.docx
+*.doc
+*.pdf
+*.md
+!README.md
